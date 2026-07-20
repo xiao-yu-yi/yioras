@@ -33,6 +33,7 @@ var rules = map[string]kindRule{
 	"software": {maxSize: 10 << 20, exts: imageExts},
 	"banner":   {maxSize: 10 << 20, exts: imageExts}, // 后台运营位
 	"deco":     {maxSize: 10 << 20, exts: imageExts}, // 后台装扮预览
+	"circle":   {maxSize: 10 << 20, exts: imageExts}, // 后台圈子图标/封面
 	"apk":      {maxSize: 500 << 20, exts: map[string]bool{".apk": true}},
 }
 

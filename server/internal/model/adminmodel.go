@@ -581,6 +581,8 @@ type AdminContentRow struct {
 	CircleID  int64     `db:"circle_id"`
 	BizType   int64     `db:"biz_type"`
 	BizID     int64     `db:"biz_id"`
+	IsTop     int64     `db:"is_top"`
+	IsEssence int64     `db:"is_essence"`
 	LikeCount int64     `db:"like_count"`
 	ViewCount int64     `db:"view_count"`
 	CreatedAt time.Time `db:"created_at"`
@@ -606,7 +608,7 @@ func (m *AdminModel) SearchPostsAdmin(ctx context.Context, keyword string, statu
 	}
 	var rows []*AdminContentRow
 	q := `SELECT p.id, p.user_id, u.nickname, p.title, p.content, p.status, p.circle_id,
-		0 AS biz_type, 0 AS biz_id, p.like_count, p.view_count, p.created_at ` + from + " ORDER BY p.id DESC LIMIT ?, ?"
+		0 AS biz_type, 0 AS biz_id, p.is_top, p.is_essence, p.like_count, p.view_count, p.created_at ` + from + " ORDER BY p.id DESC LIMIT ?, ?"
 	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
 		return 0, nil, fmt.Errorf("search posts admin: %w", err)
 	}
@@ -632,7 +634,7 @@ func (m *AdminModel) SearchCommentsAdmin(ctx context.Context, keyword string, st
 	}
 	var rows []*AdminContentRow
 	q := `SELECT c.id, c.user_id, u.nickname, '' AS title, c.content, c.status, 0 AS circle_id,
-		c.biz_type, c.biz_id, c.like_count, 0 AS view_count, c.created_at ` + from + " ORDER BY c.id DESC LIMIT ?, ?"
+		c.biz_type, c.biz_id, 0 AS is_top, 0 AS is_essence, c.like_count, 0 AS view_count, c.created_at ` + from + " ORDER BY c.id DESC LIMIT ?, ?"
 	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
 		return 0, nil, fmt.Errorf("search comments admin: %w", err)
 	}
@@ -1086,6 +1088,359 @@ func (m *AdminModel) SaveCategory(ctx context.Context, c *SoftwareCategoryFull) 
 	}
 	id, err := r.LastInsertId()
 	return id, true, err
+}
+
+// AdminCircleRow 后台圈子行(全状态)。
+type AdminCircleRow struct {
+	ID          int64  `db:"id"`
+	Name        string `db:"name"`
+	Icon        string `db:"icon"`
+	Cover       string `db:"cover"`
+	Intro       string `db:"intro"`
+	Description string `db:"description"`
+	MemberCount int64  `db:"member_count"`
+	PostCount   int64  `db:"post_count"`
+	IsOfficial  int64  `db:"is_official"`
+	Pinned      int64  `db:"pinned"`
+	Sort        int64  `db:"sort"`
+	Status      int64  `db:"status"`
+}
+
+// ListCirclesAdmin 后台圈子列表(含隐藏/解散),名称模糊。
+func (m *AdminModel) ListCirclesAdmin(ctx context.Context, keyword string, offset, limit int) (int64, []*AdminCircleRow, error) {
+	cond, args := "1 = 1", []any{}
+	if keyword != "" {
+		cond += " AND name LIKE ?"
+		args = append(args, escapeLike(keyword))
+	}
+	var total int64
+	if err := m.conn.QueryRowCtx(ctx, &total, "SELECT COUNT(1) FROM `circle` WHERE "+cond, args...); err != nil {
+		return 0, nil, fmt.Errorf("count circles: %w", err)
+	}
+	var rows []*AdminCircleRow
+	q := `SELECT id, name, icon, cover, intro, description, member_count, post_count, is_official, pinned, sort, status
+		FROM ` + "`circle`" + ` WHERE ` + cond + " ORDER BY pinned DESC, sort, id LIMIT ?, ?"
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
+		return 0, nil, fmt.Errorf("list circles admin: %w", err)
+	}
+	return total, rows, nil
+}
+
+// ErrCircleExists 圈子重名(uk_name)。
+var ErrCircleExists = fmt.Errorf("circle name exists")
+
+// SaveCircleAdmin 新建/更新圈子。解散(3)用状态标记,不物理删。
+func (m *AdminModel) SaveCircleAdmin(ctx context.Context, c *AdminCircleRow) (int64, bool, error) {
+	if c.ID > 0 {
+		if _, err := m.conn.ExecCtx(ctx,
+			`UPDATE `+"`circle`"+` SET name = ?, icon = ?, cover = ?, intro = ?, description = ?,
+			 is_official = ?, pinned = ?, sort = ?, status = ? WHERE id = ?`,
+			c.Name, c.Icon, c.Cover, c.Intro, c.Description, c.IsOfficial, c.Pinned, c.Sort, c.Status, c.ID); err != nil {
+			if IsDupKey(err) {
+				return 0, false, ErrCircleExists
+			}
+			return 0, false, fmt.Errorf("update circle: %w", err)
+		}
+		var n int
+		if err := m.conn.QueryRowCtx(ctx, &n, "SELECT COUNT(1) FROM `circle` WHERE id = ?", c.ID); err != nil {
+			return 0, false, err
+		}
+		return c.ID, n > 0, nil
+	}
+	r, err := m.conn.ExecCtx(ctx,
+		`INSERT INTO `+"`circle`"+` (name, icon, cover, intro, description, is_official, pinned, sort, status)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Name, c.Icon, c.Cover, c.Intro, c.Description, c.IsOfficial, c.Pinned, c.Sort, c.Status)
+	if err != nil {
+		if IsDupKey(err) {
+			return 0, false, ErrCircleExists
+		}
+		return 0, false, fmt.Errorf("insert circle: %w", err)
+	}
+	id, err := r.LastInsertId()
+	return id, true, err
+}
+
+// SetPostOps 帖子运营位:首页置顶(is_top)/加精(is_essence),-1 不变。仅已发布帖可操作。
+func (m *AdminModel) SetPostOps(ctx context.Context, postID, isTop, isEssence int64) (bool, error) {
+	sets, args := []string{}, []any{}
+	if isTop >= 0 {
+		sets = append(sets, "is_top = ?")
+		args = append(args, isTop)
+	}
+	if isEssence >= 0 {
+		sets = append(sets, "is_essence = ?")
+		args = append(args, isEssence)
+	}
+	if len(sets) == 0 {
+		return true, nil
+	}
+	args = append(args, postID, PostStatusPublished)
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `post` SET "+strings.Join(sets, ", ")+" WHERE id = ? AND status = ?", args...); err != nil {
+		return false, fmt.Errorf("set post ops: %w", err)
+	}
+	// RowsAffected=0 可能是值未变化,用存在性判断
+	var n int
+	if err := m.conn.QueryRowCtx(ctx, &n,
+		fmt.Sprintf("SELECT COUNT(1) FROM `post` WHERE id = ? AND status = %d", PostStatusPublished), postID); err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// AdminTopicRow 后台话题行。
+type AdminTopicRow struct {
+	ID        int64     `db:"id"`
+	Name      string    `db:"name"`
+	PostCount int64     `db:"post_count"`
+	HotScore  int64     `db:"hot_score"`
+	Status    int64     `db:"status"`
+	CreatedAt time.Time `db:"created_at"`
+}
+
+// ListTopicsAdmin 后台话题列表(含封禁),名称模糊 + 状态筛选。
+func (m *AdminModel) ListTopicsAdmin(ctx context.Context, keyword string, status int64, offset, limit int) (int64, []*AdminTopicRow, error) {
+	cond, args := "1 = 1", []any{}
+	if keyword != "" {
+		cond += " AND name LIKE ?"
+		args = append(args, escapeLike(keyword))
+	}
+	if status > 0 {
+		cond += " AND status = ?"
+		args = append(args, status)
+	}
+	var total int64
+	if err := m.conn.QueryRowCtx(ctx, &total, "SELECT COUNT(1) FROM `topic` WHERE "+cond, args...); err != nil {
+		return 0, nil, fmt.Errorf("count topics: %w", err)
+	}
+	var rows []*AdminTopicRow
+	q := "SELECT id, name, post_count, hot_score, status, created_at FROM `topic` WHERE " + cond +
+		" ORDER BY hot_score DESC, id DESC LIMIT ?, ?"
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
+		return 0, nil, fmt.Errorf("list topics admin: %w", err)
+	}
+	return total, rows, nil
+}
+
+// UpdateTopicAdmin 话题封禁/恢复与热度调整(status=0 或 hotScore<0 表示不变)。
+func (m *AdminModel) UpdateTopicAdmin(ctx context.Context, id, status, hotScore int64) (bool, error) {
+	sets, args := []string{}, []any{}
+	if status > 0 {
+		sets = append(sets, "status = ?")
+		args = append(args, status)
+	}
+	if hotScore >= 0 {
+		sets = append(sets, "hot_score = ?")
+		args = append(args, hotScore)
+	}
+	if len(sets) == 0 {
+		return true, nil
+	}
+	args = append(args, id)
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `topic` SET "+strings.Join(sets, ", ")+" WHERE id = ?", args...); err != nil {
+		return false, fmt.Errorf("update topic: %w", err)
+	}
+	var n int
+	if err := m.conn.QueryRowCtx(ctx, &n, "SELECT COUNT(1) FROM `topic` WHERE id = ?", id); err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// AdminYouzhuLogRow 后台流水行(join 昵称)。
+type AdminYouzhuLogRow struct {
+	ID           int64     `db:"id"`
+	UserID       int64     `db:"user_id"`
+	Nickname     string    `db:"nickname"`
+	BizType      int64     `db:"biz_type"`
+	BizKey       string    `db:"biz_key"`
+	Amount       int64     `db:"amount"`
+	BalanceAfter int64     `db:"balance_after"`
+	Remark       string    `db:"remark"`
+	CreatedAt    time.Time `db:"created_at"`
+}
+
+// ListYouzhuLogsAdmin 后台流水查询:用户/业务类型筛选,最新在前。
+func (m *AdminModel) ListYouzhuLogsAdmin(ctx context.Context, uid, bizType int64, offset, limit int) (int64, []*AdminYouzhuLogRow, error) {
+	cond, args := "1 = 1", []any{}
+	if uid > 0 {
+		cond += " AND l.user_id = ?"
+		args = append(args, uid)
+	}
+	if bizType > 0 {
+		cond += " AND l.biz_type = ?"
+		args = append(args, bizType)
+	}
+	from := "FROM `youzhu_log` l JOIN `user` u ON u.id = l.user_id WHERE " + cond
+
+	var total int64
+	if err := m.conn.QueryRowCtx(ctx, &total, "SELECT COUNT(1) "+from, args...); err != nil {
+		return 0, nil, fmt.Errorf("count youzhu logs: %w", err)
+	}
+	var rows []*AdminYouzhuLogRow
+	q := `SELECT l.id, l.user_id, u.nickname, l.biz_type, l.biz_key, l.amount, l.balance_after,
+		COALESCE(l.remark, '') AS remark, l.created_at ` + from + " ORDER BY l.id DESC LIMIT ?, ?"
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
+		return 0, nil, fmt.Errorf("list youzhu logs admin: %w", err)
+	}
+	return total, rows, nil
+}
+
+// AdminPrettyNoRow 后台靓号行。
+type AdminPrettyNoRow struct {
+	ID     int64        `db:"id"`
+	No     string       `db:"no"`
+	Rarity int64        `db:"rarity"`
+	Price  int64        `db:"price"`
+	Status int64        `db:"status"`
+	SoldTo int64        `db:"sold_to"`
+	SoldAt sql.NullTime `db:"sold_at"`
+}
+
+// ListPrettyNosAdmin 后台靓号列表(含下架/已售)。
+func (m *AdminModel) ListPrettyNosAdmin(ctx context.Context, keyword string, status int64, offset, limit int) (int64, []*AdminPrettyNoRow, error) {
+	cond, args := "1 = 1", []any{}
+	if keyword != "" {
+		cond += " AND no LIKE ?"
+		args = append(args, escapeLike(keyword))
+	}
+	if status >= 0 {
+		cond += " AND status = ?"
+		args = append(args, status)
+	}
+	var total int64
+	if err := m.conn.QueryRowCtx(ctx, &total, "SELECT COUNT(1) FROM `pretty_no_sku` WHERE "+cond, args...); err != nil {
+		return 0, nil, fmt.Errorf("count pretty nos: %w", err)
+	}
+	var rows []*AdminPrettyNoRow
+	q := "SELECT id, no, rarity, price, status, sold_to, sold_at FROM `pretty_no_sku` WHERE " + cond +
+		" ORDER BY status, rarity DESC, price DESC, id LIMIT ?, ?"
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
+		return 0, nil, fmt.Errorf("list pretty nos admin: %w", err)
+	}
+	return total, rows, nil
+}
+
+// ErrPrettyNoExists 靓号号码已存在(uk_no)。
+var ErrPrettyNoExists = fmt.Errorf("pretty no exists")
+
+// ErrPrettyNoSold 靓号已售出,不可修改。
+var ErrPrettyNoSold = fmt.Errorf("pretty no sold")
+
+// SavePrettyNoAdmin 新增/更新靓号 SKU。已售(status=2)行禁止修改,防篡改成交记录。
+func (m *AdminModel) SavePrettyNoAdmin(ctx context.Context, p *AdminPrettyNoRow) (int64, bool, error) {
+	if p.ID > 0 {
+		r, err := m.conn.ExecCtx(ctx,
+			"UPDATE `pretty_no_sku` SET no = ?, rarity = ?, price = ?, status = ? WHERE id = ? AND status != 2",
+			p.No, p.Rarity, p.Price, p.Status, p.ID)
+		if err != nil {
+			if IsDupKey(err) {
+				return 0, false, ErrPrettyNoExists
+			}
+			return 0, false, fmt.Errorf("update pretty no: %w", err)
+		}
+		if n, _ := r.RowsAffected(); n == 0 {
+			// 区分不存在与已售
+			var st int64
+			if err := m.conn.QueryRowCtx(ctx, &st,
+				"SELECT status FROM `pretty_no_sku` WHERE id = ? LIMIT 1", p.ID); err != nil {
+				if IsNotFound(err) {
+					return 0, false, nil
+				}
+				return 0, false, err
+			}
+			if st == 2 {
+				return 0, false, ErrPrettyNoSold
+			}
+		}
+		return p.ID, true, nil
+	}
+	r, err := m.conn.ExecCtx(ctx,
+		"INSERT INTO `pretty_no_sku` (no, rarity, price, status) VALUES (?, ?, ?, ?)",
+		p.No, p.Rarity, p.Price, p.Status)
+	if err != nil {
+		if IsDupKey(err) {
+			return 0, false, ErrPrettyNoExists
+		}
+		return 0, false, fmt.Errorf("insert pretty no: %w", err)
+	}
+	id, err := r.LastInsertId()
+	return id, true, err
+}
+
+// AgreementRow 协议静态页。
+type AgreementRow struct {
+	Kind      string    `db:"kind"`
+	Title     string    `db:"title"`
+	Content   string    `db:"content"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+func (m *AdminModel) GetAgreement(ctx context.Context, kind string) (*AgreementRow, error) {
+	var row AgreementRow
+	err := m.conn.QueryRowCtx(ctx, &row,
+		"SELECT kind, title, content, updated_at FROM `agreement` WHERE kind = ? LIMIT 1", kind)
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (m *AdminModel) SaveAgreement(ctx context.Context, kind, title, content string) error {
+	if _, err := m.conn.ExecCtx(ctx,
+		`INSERT INTO agreement (kind, title, content) VALUES (?, ?, ?)
+		 ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content)`,
+		kind, title, content); err != nil {
+		return fmt.Errorf("save agreement: %w", err)
+	}
+	return nil
+}
+
+// SetUserLevel 后台调整等级/经验(<0 不变)。
+func (m *AdminModel) SetUserLevel(ctx context.Context, uid, level, exp int64) (bool, error) {
+	sets, args := []string{}, []any{}
+	if level >= 0 {
+		sets = append(sets, "level = ?")
+		args = append(args, level)
+	}
+	if exp >= 0 {
+		sets = append(sets, "exp = ?")
+		args = append(args, exp)
+	}
+	if len(sets) == 0 {
+		return true, nil
+	}
+	args = append(args, uid)
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `user` SET "+strings.Join(sets, ", ")+" WHERE id = ? AND status != 4", args...); err != nil {
+		return false, fmt.Errorf("set user level: %w", err)
+	}
+	var n int
+	if err := m.conn.QueryRowCtx(ctx, &n, "SELECT COUNT(1) FROM `user` WHERE id = ? AND status != 4", uid); err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// GrantTitle 授予/撤销头衔(达人/开发者):直接落 certification 通过/驳回态。
+func (m *AdminModel) GrantTitle(ctx context.Context, uid, kind int64, grant bool) error {
+	if grant {
+		if _, err := m.conn.ExecCtx(ctx,
+			`INSERT INTO certification (user_id, kind, material, status) VALUES (?, ?, '后台授予', ?)
+			 ON DUPLICATE KEY UPDATE status = VALUES(status), reason = ''`,
+			uid, kind, CertStatusApproved); err != nil {
+			return fmt.Errorf("grant title: %w", err)
+		}
+		return nil
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `certification` SET status = ?, reason = '后台撤销' WHERE user_id = ? AND kind = ?",
+		CertStatusRejected, uid, kind); err != nil {
+		return fmt.Errorf("revoke title: %w", err)
+	}
+	return nil
 }
 
 // AppointCircleRole 圈主/管理员任命(后台动作):确保成员行并设角色。

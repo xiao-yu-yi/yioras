@@ -110,6 +110,8 @@ export interface AdminContentItem {
   circleId?: number
   bizType?: number
   bizId?: number
+  isTop: number
+  isEssence: number
   likeCount: number
   viewCount: number
   createdAt: number
@@ -280,6 +282,85 @@ export const api = {
   saveCategory: (c: Partial<AdminCategoryItem>) => http.post('/software/categories', c) as Promise<{ id: number }>,
   presign: (kind: string, fileName: string, size: number) =>
     http.post('/upload/presign', { kind, fileName, size }) as Promise<{ uploadUrl: string; fileUrl: string }>,
+  // 圈子管理
+  circles: (params: { keyword?: string; page: number; size: number }) =>
+    http.get('/circles', { params }) as Promise<{ total: number; list: AdminCircleItem[] }>,
+  saveCircle: (c: Partial<AdminCircleItem>) => http.post('/circles', c) as Promise<{ id: number }>,
+  appointCircle: (circleId: number, userId: number, role: number) =>
+    http.post(`/circles/${circleId}/appoint`, { userId, role }),
+  // 帖子运营位
+  postOps: (postId: number, patch: { isTop?: number; isEssence?: number }) =>
+    http.post(`/posts/${postId}/ops`, patch),
+  // 话题管理
+  topics: (params: { keyword?: string; status: number; page: number; size: number }) =>
+    http.get('/topics', { params }) as Promise<{ total: number; list: AdminTopicItem[] }>,
+  updateTopic: (id: number, patch: { status?: number; hotScore?: number }) =>
+    http.post(`/topics/${id}`, patch),
+  // 忧珠运营
+  grantYouzhu: (userId: number, amount: number, reason: string) =>
+    http.post('/youzhu/grant', { userId, amount, reason }),
+  youzhuLogs: (params: { userId?: number; bizType: number; page: number; size: number }) =>
+    http.get('/youzhu/logs', { params }) as Promise<{ total: number; list: AdminYouzhuLogItem[] }>,
+  // 靓号库
+  prettyNos: (params: { keyword?: string; status: number; page: number; size: number }) =>
+    http.get('/mall/prettynos', { params }) as Promise<{ total: number; list: AdminPrettyNoItem[] }>,
+  savePrettyNo: (p: Partial<AdminPrettyNoItem>) => http.post('/mall/prettynos', p) as Promise<{ id: number }>,
+  // 用户等级/头衔
+  setUserLevel: (userId: number, patch: { level?: number; exp?: number }) =>
+    http.post(`/users/${userId}/level`, patch),
+  grantUserTitle: (userId: number, kind: number, grant: boolean) =>
+    http.post(`/users/${userId}/title`, { kind, grant }),
+  // 协议管理
+  agreement: (kind: string) =>
+    http.get(`/agreements/${kind}`) as Promise<{ kind: string; title: string; content: string; updatedAt: number }>,
+  saveAgreement: (kind: string, title: string, content: string) =>
+    http.post(`/agreements/${kind}`, { title, content }),
+}
+
+export interface AdminCircleItem {
+  id: number
+  name: string
+  icon: string
+  cover: string
+  intro: string
+  description: string
+  memberCount: number
+  postCount: number
+  isOfficial: number
+  pinned: number
+  sort: number
+  status: number
+}
+
+export interface AdminTopicItem {
+  id: number
+  name: string
+  postCount: number
+  hotScore: number
+  status: number
+  createdAt: number
+}
+
+export interface AdminYouzhuLogItem {
+  id: number
+  userId: number
+  nickname: string
+  bizType: number
+  bizKey: string
+  amount: number
+  balanceAfter: number
+  remark: string
+  createdAt: number
+}
+
+export interface AdminPrettyNoItem {
+  id: number
+  no: string
+  rarity: number
+  price: number
+  status: number
+  soldTo: number
+  soldAt: number
 }
 
 // uploadFile 预签名直传:签名 → 裸 PUT 文件到对象存储 → 返回可落库的公开 URL

@@ -24,10 +24,14 @@ pnpm build            # 产物 dist/
 | `/contents` | 内容管理 | `GET /admin/v1/contents` + `POST /admin/v1/contents/takedown`(一键下架/恢复,计数自动回补) |
 | `/reports` | 举报处理 | `GET /admin/v1/reports` + `POST /admin/v1/reports/:id/handle`;弹窗内快捷下架/处置用户后结单 |
 | `/certs` | 认证审核 | `GET /admin/v1/certifications`、`POST /admin/v1/certifications/:id/decide` |
-| `/users` | 用户管理 | `GET /admin/v1/users`(昵称/编号/邮箱搜索+状态筛选) + `POST /admin/v1/users/:id/ban` |
+| `/users` | 用户管理 | `GET /admin/v1/users` 搜索筛选 + `/users/:id/ban` 处置 + `/users/:id/level` 等级调整 + `/users/:id/title` 头衔授予撤销 |
 | `/banners` | Banner 配置 | `GET/POST/DELETE /admin/v1/banners`(图片经 UploadImage 组件直传对象存储) |
 | `/notices` | 公告群发 | `POST /admin/v1/notices`(全员推送,二次确认) |
-| `/mall-config` | 商城/任务配置 | `GET/POST /admin/v1/mall/{decorations,prizes,tasks}`(三 tab CRUD,保存即生效) |
+| `/circles` | 圈子管理 | `GET/POST /admin/v1/circles`(创建/排序/官方标记/隐藏解散) + `/circles/:id/appoint` 圈主任命 |
+| `/topics` | 话题管理 | `GET/POST /admin/v1/topics`(封禁/恢复/热度调整) |
+| `/youzhu` | 忧珠运营 | `POST /admin/v1/youzhu/grant`(手动发放/回收,幂等账本+通知) + `GET /admin/v1/youzhu/logs`(全站流水查询) |
+| `/mall-config` | 商城/任务配置 | `GET/POST /admin/v1/mall/{decorations,prizes,tasks,prettynos}`(四 tab CRUD,保存即生效;已售靓号锁定) |
+| `/agreements` | 协议管理 | `GET/POST /admin/v1/agreements/:kind`(用户协议/隐私政策,客户端 `GET /api/v1/agreements/:kind` 拉取) |
 | `/categories` | 软件分类 | `GET/POST /admin/v1/software/categories` |
 | `/words` | 敏感词库 | `GET/POST/DELETE /admin/v1/words`(保存即热更新过滤器) |
 | `/faqs` | AI 管家 FAQ | `GET/POST/DELETE /admin/v1/faqs`(即时生效) |

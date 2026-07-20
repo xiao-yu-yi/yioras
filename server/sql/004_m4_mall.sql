@@ -10,10 +10,10 @@
 SET NAMES utf8mb4;
 USE yiora;
 
--- 装扮(头像框/聊天气泡)
+-- 装扮(头像框;气泡商城已按需求裁剪)
 CREATE TABLE `decoration` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `kind`          TINYINT         NOT NULL COMMENT '1头像框 2气泡',
+  `kind`          TINYINT         NOT NULL COMMENT '1头像框',
   `name`          VARCHAR(30)     NOT NULL,
   `preview`       VARCHAR(255)    NOT NULL COMMENT '预览/素材URL(CDN)',
   `price`         INT             NOT NULL COMMENT '忧珠价格',
@@ -98,8 +98,7 @@ CREATE TABLE `exchange_record` (
 -- 种子:装扮 / 靓号 / 奖池
 INSERT INTO `decoration` (`kind`, `name`, `preview`, `price`, `duration_days`, `sort`) VALUES
   (1, '星空头像框', 'https://cdn.example.com/deco/star-frame.png', 30, 0, 10),
-  (1, '樱花头像框(7天)', 'https://cdn.example.com/deco/sakura-frame.png', 10, 7, 20),
-  (2, '云朵气泡', 'https://cdn.example.com/deco/cloud-bubble.png', 20, 0, 10);
+  (1, '樱花头像框(7天)', 'https://cdn.example.com/deco/sakura-frame.png', 10, 7, 20);
 
 INSERT INTO `pretty_no_sku` (`no`, `rarity`, `price`) VALUES
   ('N66666', 2, 100), ('N88888', 3, 300), ('N12321', 1, 50);

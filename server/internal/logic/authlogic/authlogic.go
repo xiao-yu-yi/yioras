@@ -99,7 +99,7 @@ func (l *Logic) Register(ctx context.Context, req *types.RegisterReq, ip string)
 	_ = l.svcCtx.UserModel.TouchLogin(ctx, uid, ip)
 	// AI 管家自动问候,新用户消息列表即出现管家会话(失败只记日志)
 	imlogic.SendBotWelcome(ctx, l.svcCtx, uid)
-	return l.issueToken(uid, nickname, "N"+fmt.Sprint(uid), "", true)
+	return l.issueToken(ctx, uid, nickname, "N"+fmt.Sprint(uid), "", req.DeviceName, ip, true)
 }
 
 func (l *Logic) Login(ctx context.Context, req *types.LoginReq, ip string) (*types.TokenResp, error) {
@@ -125,7 +125,7 @@ func (l *Logic) Login(ctx context.Context, req *types.LoginReq, ip string) (*typ
 		return nil, xerr.New(xerr.CodeForbidden, "账号不可用")
 	}
 	_ = l.svcCtx.UserModel.TouchLogin(ctx, u.ID, ip)
-	return l.issueToken(u.ID, u.Nickname, u.DisplayNo.String, u.Avatar, false)
+	return l.issueToken(ctx, u.ID, u.Nickname, u.DisplayNo.String, u.Avatar, req.DeviceName, ip, false)
 }
 
 // ResetPassword 邮箱验证码重置密码(找回)。旧 JWT 在有效期内仍可用,会话吊销属后续版本。
@@ -167,13 +167,15 @@ func (l *Logic) consumeCode(ctx context.Context, scene, email, input string) err
 	return nil
 }
 
-func (l *Logic) issueToken(uid int64, nickname, displayNo, avatar string, isNew bool) (*types.TokenResp, error) {
-	token, expireAt, err := jwtx.GenToken(l.svcCtx.Config.Auth.AccessSecret, uid, l.svcCtx.Config.Auth.AccessExpire)
+func (l *Logic) issueToken(ctx context.Context, uid int64, nickname, displayNo, avatar, deviceName, ip string, isNew bool) (*types.TokenResp, error) {
+	deviceID, refreshToken, refreshExpireAt := l.registerDevice(ctx, uid, deviceName, ip)
+	token, expireAt, err := jwtx.GenUserToken(l.svcCtx.Config.Auth.AccessSecret, uid, deviceID, l.svcCtx.Config.Auth.AccessExpire)
 	if err != nil {
 		return nil, fmt.Errorf("gen token: %w", err)
 	}
 	return &types.TokenResp{
 		UserID: uid, Token: token, ExpireAt: expireAt,
+		RefreshToken: refreshToken, RefreshExpireAt: refreshExpireAt, DeviceID: deviceID,
 		IsNewUser: isNew, DisplayNo: displayNo, Nickname: nickname, Avatar: avatar,
 	}, nil
 }

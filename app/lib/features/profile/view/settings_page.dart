@@ -110,63 +110,148 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    Widget group(List<Widget> children) => Card(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      child: Column(children: children),
-    );
+    Widget group(String title, List<Widget> children) {
+      final items = <Widget>[];
+      for (var i = 0; i < children.length; i++) {
+        if (i > 0) {
+          items.add(
+            Divider(
+              height: 1,
+              thickness: .6,
+              indent: 56,
+              color: scheme.outlineVariant.withValues(alpha: .4),
+            ),
+          );
+        }
+        items.add(children[i]);
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 6),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: scheme.outline,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(children: items),
+          ),
+        ],
+      );
+    }
 
     Widget item(
       IconData icon,
       String label, {
+      required Color iconColor,
+      required Color iconBg,
       VoidCallback? onTap,
       Widget? trailing,
       Color? color,
-    }) => ListTile(
-      leading: Icon(icon, color: color ?? scheme.onSurfaceVariant),
-      title: Text(label, style: TextStyle(fontSize: 14.5, color: color)),
-      trailing: trailing ?? Icon(Icons.chevron_right, color: scheme.outline),
-      dense: true,
+    }) => InkWell(
       onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 17, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ),
+            trailing ??
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: scheme.outlineVariant,
+                ),
+          ],
+        ),
+      ),
+    );
+
+    Widget spinner() => const SizedBox(
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(strokeWidth: 2),
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('我的设置')),
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF6F7F9),
+        title: const Text(
+          '我的设置',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          group([
+          group('账号', [
             item(
               Icons.person_outline,
               '编辑资料',
+              iconColor: const Color(0xFFF43F5E),
+              iconBg: const Color(0xFFFEECEF),
               onTap: () => context.push(Routes.editProfile),
             ),
             item(
               Icons.security_outlined,
               '账号安全',
+              iconColor: const Color(0xFF3B82F6),
+              iconBg: const Color(0xFFEAF2FE),
               onTap: () => _comingSoon('账号安全'),
             ),
             item(
-              Icons.notifications_none,
+              Icons.notifications_none_rounded,
               '通知设置',
+              iconColor: const Color(0xFFF59E0B),
+              iconBg: const Color(0xFFFEF4E2),
               onTap: () => _comingSoon('通知设置'),
             ),
           ]),
-          group([
+          group('通用', [
             item(
               Icons.cleaning_services_outlined,
               '清理缓存',
-              trailing: _clearingCache
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(Icons.chevron_right, color: scheme.outline),
+              iconColor: const Color(0xFF10B981),
+              iconBg: const Color(0xFFE7F7F0),
+              trailing: _clearingCache ? spinner() : null,
               onTap: _clearCache,
             ),
             item(
-              Icons.info_outline,
+              Icons.info_outline_rounded,
               '关于 Yiora',
+              iconColor: const Color(0xFF64748B),
+              iconBg: const Color(0xFFF3F4F8),
               onTap: () => showAboutDialog(
                 context: context,
                 applicationName: 'Yiora',
@@ -175,29 +260,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
           ]),
-          group([
+          group('账号操作', [
             item(
               Icons.person_off_outlined,
               '注销账号',
+              iconColor: scheme.error,
+              iconBg: scheme.error.withValues(alpha: .08),
               color: scheme.error,
-              trailing: _deactivating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(Icons.chevron_right, color: scheme.outline),
+              trailing: _deactivating ? spinner() : null,
               onTap: _deactivateAccount,
             ),
           ]),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(46),
+                minimumSize: const Size.fromHeight(48),
                 foregroundColor: scheme.error,
-                side: BorderSide(color: scheme.error.withValues(alpha: .4)),
+                backgroundColor: Colors.white,
+                side: BorderSide(color: scheme.error.withValues(alpha: .3)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               onPressed: () async {
                 final confirmed = await showDialog<bool>(

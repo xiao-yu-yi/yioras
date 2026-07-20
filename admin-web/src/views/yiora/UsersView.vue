@@ -53,9 +53,12 @@
       <el-table-column label="最近登录" width="160">
         <template #default="{ row }">{{ row.lastLoginAt ? fmt(row.lastLoginAt) : '从未登录' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="170" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="row.status !== 4" size="small" type="warning" @click="openBan(row)">处置</el-button>
+          <template v-if="row.status !== 4">
+            <el-button size="small" type="warning" @click="openBan(row)">处置</el-button>
+            <el-button size="small" @click="openGrow(row)">等级/头衔</el-button>
+          </template>
           <span v-else class="sub">不可操作</span>
         </template>
       </el-table-column>
@@ -88,6 +91,23 @@
         <el-button @click="dialog = false">取消</el-button>
         <el-button type="danger" :loading="submitting" @click="submit">确认执行</el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog v-model="growDialog" :title="`等级/头衔:「${current?.nickname}」`" width="440px">
+      <el-form label-width="90px">
+        <el-form-item label="等级">
+          <el-input-number v-model="growLevel" :min="0" :max="100" />
+          <el-button size="small" style="margin-left: 8px" :loading="submitting" @click="saveLevel">应用等级</el-button>
+        </el-form-item>
+        <el-form-item label="达人认证">
+          <el-button size="small" type="success" :loading="submitting" @click="title(1, true)">授予</el-button>
+          <el-button size="small" type="info" :loading="submitting" @click="title(1, false)">撤销</el-button>
+        </el-form-item>
+        <el-form-item label="开发者认证">
+          <el-button size="small" type="success" :loading="submitting" @click="title(2, true)">授予</el-button>
+          <el-button size="small" type="info" :loading="submitting" @click="title(2, false)">撤销</el-button>
+        </el-form-item>
+      </el-form>
     </el-dialog>
   </el-card>
 </template>
@@ -143,6 +163,38 @@ function openBan(row: AdminUserItem) {
   action.value = row.status === 1 ? 2 : 0
   days.value = 1
   dialog.value = true
+}
+
+const growDialog = ref(false)
+const growLevel = ref(0)
+
+function openGrow(row: AdminUserItem) {
+  current.value = row
+  growLevel.value = row.level
+  growDialog.value = true
+}
+
+async function saveLevel() {
+  if (!current.value) return
+  submitting.value = true
+  try {
+    await api.setUserLevel(current.value.userId, { level: growLevel.value })
+    ElMessage.success('等级已调整')
+    load()
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function title(kind: number, grant: boolean) {
+  if (!current.value) return
+  submitting.value = true
+  try {
+    await api.grantUserTitle(current.value.userId, kind, grant)
+    ElMessage.success(grant ? '已授予并通知用户' : '已撤销并通知用户')
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function submit() {

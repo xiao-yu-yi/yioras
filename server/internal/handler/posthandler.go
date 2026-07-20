@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/yiora/server/internal/logic/authlogic"
 	"github.com/yiora/server/internal/logic/postlogic"
 	"github.com/yiora/server/internal/logic/userlogic"
 	"github.com/yiora/server/internal/pkg/jwtx"
@@ -51,6 +52,13 @@ func deactivatedGuard(svcCtx *svc.ServiceContext) func(http.HandlerFunc) http.Ha
 				if banned, err := svcCtx.Redis.ExistsCtx(r.Context(), userlogic.BannedKey(uid)); err == nil && banned {
 					resp.Error(w, r, xerr.New(xerr.CodeUnauthorized, "账号已被封禁"))
 					return
+				}
+				// 设备被踢下线(仅新版带 did claim 的 token 参与)
+				if did := didFromCtx(r); did != "" {
+					if kicked, err := svcCtx.Redis.ExistsCtx(r.Context(), authlogic.KickKey(uid, did)); err == nil && kicked {
+						resp.Error(w, r, xerr.New(xerr.CodeUnauthorized, "该设备已被下线,请重新登录"))
+						return
+					}
 				}
 			}
 			next(w, r)

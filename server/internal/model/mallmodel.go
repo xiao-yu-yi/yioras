@@ -12,10 +12,9 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
-// 装扮类型(decoration.kind)
+// 装扮类型(decoration.kind);气泡商城已按需求裁剪,仅保留头像框
 const (
 	DecoKindAvatarFrame = 1
-	DecoKindBubble      = 2
 )
 
 // 兑换记录类型(exchange_record.kind)

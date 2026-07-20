@@ -26,6 +26,14 @@ func uidFromCtx(r *http.Request) (int64, bool) {
 	return 0, false
 }
 
+// didFromCtx 取设备标识 claim;旧 token 无此 claim 返回空(跳过设备检查)。
+func didFromCtx(r *http.Request) string {
+	if s, ok := r.Context().Value(jwtx.ClaimDID).(string); ok {
+		return s
+	}
+	return ""
+}
+
 func meHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, ok := mustUID(w, r)

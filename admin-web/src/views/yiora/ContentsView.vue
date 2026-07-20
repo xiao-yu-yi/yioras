@@ -44,6 +44,24 @@
       <el-table-column label="数据" width="110">
         <template #default="{ row }">赞 {{ row.likeCount }}<template v-if="type === 1"> / 看 {{ row.viewCount }}</template></template>
       </el-table-column>
+      <el-table-column v-if="type === 1" label="首页置顶" width="90">
+        <template #default="{ row }">
+          <el-switch
+            :model-value="row.isTop === 1"
+            :disabled="row.status !== 1"
+            @change="(v: boolean) => toggleOps(row, 'isTop', v)"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column v-if="type === 1" label="加精" width="80">
+        <template #default="{ row }">
+          <el-switch
+            :model-value="row.isEssence === 1"
+            :disabled="row.status !== 1"
+            @change="(v: boolean) => toggleOps(row, 'isEssence', v)"
+          />
+        </template>
+      </el-table-column>
       <el-table-column label="发布时间" width="160">
         <template #default="{ row }">{{ fmt(row.createdAt) }}</template>
       </el-table-column>
@@ -166,6 +184,12 @@ async function submitTakedown() {
   } finally {
     submitting.value = false
   }
+}
+
+async function toggleOps(row: AdminContentItem, field: 'isTop' | 'isEssence', on: boolean) {
+  await api.postOps(row.id, { [field]: on ? 1 : 0 })
+  row[field] = on ? 1 : 0
+  ElMessage.success(field === 'isTop' ? (on ? '已置顶到首页精选' : '已取消置顶') : on ? '已加精' : '已取消加精')
 }
 
 async function restore(row: AdminContentItem) {

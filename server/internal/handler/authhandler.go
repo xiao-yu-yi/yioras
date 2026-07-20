@@ -43,6 +43,56 @@ func registerHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+func refreshTokenHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.RefreshReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := authlogic.New(svcCtx).Refresh(r.Context(), &req, httpx.GetRemoteAddr(r))
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
+func deviceListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := mustUID(w, r)
+		if !ok {
+			return
+		}
+		out, err := authlogic.New(svcCtx).Devices(r.Context(), uid, didFromCtx(r))
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
+func kickDeviceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := mustUID(w, r)
+		if !ok {
+			return
+		}
+		var req types.KickDeviceReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := authlogic.New(svcCtx).KickDevice(r.Context(), uid, req.DeviceID); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	}
+}
+
 func resetPasswordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.ResetPasswordReq

@@ -283,6 +283,84 @@ func adminDecideCertHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminCirclesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "circle.manage", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.AdminCircleListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).Circles(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminSaveCircleHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "circle.manage", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminCircleSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		cid, err := adminlogic.New(svcCtx).SaveCircle(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r))
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, map[string]int64{"id": cid})
+	})
+}
+
+func adminPostOpsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminPostOpsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).PostOps(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
+func adminTopicsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.AdminTopicListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).Topics(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminUpdateTopicHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminTopicUpdateReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).UpdateTopic(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
 func adminAppointHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "circle.manage", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
 		var req types.AppointReq
@@ -607,6 +685,69 @@ func adminSavePrizeHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminGrantYouzhuHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminYouzhuGrantReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).GrantYouzhu(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
+func adminYouzhuLogsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.AdminYouzhuLogListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).YouzhuLogs(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminPrettyNosHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.AdminPrettyNoListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).PrettyNos(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminSavePrettyNoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminPrettyNoSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		pid, err := adminlogic.New(svcCtx).SavePrettyNo(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r))
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, map[string]int64{"id": pid})
+	})
+}
+
 func adminTaskCfgsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
 		out, err := adminlogic.New(svcCtx).TaskCfgs(r.Context())
@@ -691,6 +832,84 @@ func adminPresignHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		resp.OK(w, r, out)
+	})
+}
+
+// agreementHandler 用户侧协议读取(免登录)。
+func agreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AgreementPathReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).Agreement(r.Context(), req.Kind)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
+func adminAgreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.notice", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.AgreementPathReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).Agreement(r.Context(), req.Kind)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminSaveAgreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.notice", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminAgreementSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).SaveAgreement(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
+func adminUserLevelHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminUserLevelReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).SetUserLevel(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
+func adminUserTitleHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminUserTitleReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).GrantUserTitle(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
 	})
 }
 

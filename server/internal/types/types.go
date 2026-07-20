@@ -7,15 +7,34 @@ type EmailCodeReq struct {
 }
 
 type RegisterReq struct {
-	Email    string `json:"email"`
-	Code     string `json:"code"`
-	Password string `json:"password"` // 8-32 位
-	Nickname string `json:"nickname,optional"`
+	Email      string `json:"email"`
+	Code       string `json:"code"`
+	Password   string `json:"password"` // 8-32 位
+	Nickname   string `json:"nickname,optional"`
+	DeviceName string `json:"deviceName,optional"` // 设备名,如 "Xiaomi 14"
 }
 
 type LoginReq struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	DeviceName string `json:"deviceName,optional"`
+}
+
+type RefreshReq struct {
+	RefreshToken string `json:"refreshToken"`
+	DeviceID     string `json:"deviceId"`
+}
+
+type DeviceItem struct {
+	DeviceID    string `json:"deviceId"`
+	Name        string `json:"name"`
+	IP          string `json:"ip"`
+	LastLoginAt int64  `json:"lastLoginAt"`
+	Current     bool   `json:"current"` // 是否当前请求所用设备
+}
+
+type KickDeviceReq struct {
+	DeviceID string `path:"id"`
 }
 
 type ResetPasswordReq struct {
@@ -29,13 +48,16 @@ type DeactivateReq struct {
 }
 
 type TokenResp struct {
-	UserID    int64  `json:"userId"`
-	Token     string `json:"token"`
-	ExpireAt  int64  `json:"expireAt"` // Unix 秒
-	IsNewUser bool   `json:"isNewUser"`
-	DisplayNo string `json:"displayNo"`
-	Nickname  string `json:"nickname"`
-	Avatar    string `json:"avatar"`
+	UserID          int64  `json:"userId"`
+	Token           string `json:"token"`
+	ExpireAt        int64  `json:"expireAt"` // Unix 秒
+	RefreshToken    string `json:"refreshToken"`
+	RefreshExpireAt int64  `json:"refreshExpireAt"` // Unix 秒
+	DeviceID        string `json:"deviceId"`        // 客户端持久化,刷新/设备管理用
+	IsNewUser       bool   `json:"isNewUser"`
+	DisplayNo       string `json:"displayNo"`
+	Nickname        string `json:"nickname"`
+	Avatar          string `json:"avatar"`
 }
 
 type UserInfoResp struct {
@@ -331,7 +353,7 @@ type YouzhuLogItem struct {
 // ---- 忧珠商城(装扮/靓号/抽奖/兑换记录) ----
 
 type DecorationListReq struct {
-	Kind int64 `form:"kind,optional"` // 0全部 1头像框 2气泡
+	Kind int64 `form:"kind,optional"` // 0全部 1头像框
 }
 
 type DecorationItem struct {
@@ -539,7 +561,7 @@ type AdminFaqSaveReq struct {
 
 type AdminDecoItem struct {
 	ID           int64  `json:"id"`
-	Kind         int64  `json:"kind"` // 1头像框 2气泡
+	Kind         int64  `json:"kind"` // 1头像框
 	Name         string `json:"name"`
 	Preview      string `json:"preview"`
 	Price        int64  `json:"price"`
@@ -608,7 +630,7 @@ type AdminTaskSaveReq struct {
 // ---- 对象存储直传 ----
 
 type PresignReq struct {
-	Kind     string `json:"kind,options=avatar|cover|post|software|banner|deco|apk"` // 用途决定目录/大小/类型限制
+	Kind     string `json:"kind,options=avatar|cover|post|software|banner|deco|circle|apk"` // 用途决定目录/大小/类型限制
 	FileName string `json:"fileName"`
 	Size     int64  `json:"size"` // 字节,用于服务端预校验
 }
@@ -645,6 +667,177 @@ type AdminCategorySaveReq struct {
 	Name   string `json:"name"`
 	Sort   int64  `json:"sort,optional"`
 	Status int64  `json:"status,optional,options=0|1,default=1"`
+}
+
+// ---- 后台圈子管理 ----
+
+type AdminCircleListReq struct {
+	Keyword string `form:"keyword,optional"`
+	PageReq
+}
+
+type AdminCircleItem struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Cover       string `json:"cover"`
+	Intro       string `json:"intro"`
+	Description string `json:"description"`
+	MemberCount int64  `json:"memberCount"`
+	PostCount   int64  `json:"postCount"`
+	IsOfficial  int64  `json:"isOfficial"`
+	Pinned      int64  `json:"pinned"`
+	Sort        int64  `json:"sort"`
+	Status      int64  `json:"status"` // 1正常 2隐藏 3解散
+}
+
+type AdminCircleListResp struct {
+	Total int64             `json:"total"`
+	List  []AdminCircleItem `json:"list"`
+}
+
+type AdminCircleSaveReq struct {
+	ID          int64  `json:"id,optional"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Cover       string `json:"cover,optional"`
+	Intro       string `json:"intro,optional"`
+	Description string `json:"description,optional"`
+	IsOfficial  int64  `json:"isOfficial,optional,options=0|1"`
+	Pinned      int64  `json:"pinned,optional,options=0|1"`
+	Sort        int64  `json:"sort,optional"`
+	Status      int64  `json:"status,optional,options=1|2|3,default=1"`
+}
+
+// ---- 帖子运营置顶/加精 ----
+
+type AdminPostOpsReq struct {
+	PostID    int64 `path:"id"`
+	IsTop     int64 `json:"isTop,optional,options=0|1|-1,default=-1"`     // 首页置顶精选,-1 不变
+	IsEssence int64 `json:"isEssence,optional,options=0|1|-1,default=-1"` // 加精,-1 不变
+}
+
+// ---- 话题管理 ----
+
+type AdminTopicListReq struct {
+	Keyword string `form:"keyword,optional"`
+	Status  int64  `form:"status,optional,options=0|1|2"` // 0全部 1正常 2封禁
+	PageReq
+}
+
+type AdminTopicItem struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	PostCount int64  `json:"postCount"`
+	HotScore  int64  `json:"hotScore"`
+	Status    int64  `json:"status"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+type AdminTopicListResp struct {
+	Total int64            `json:"total"`
+	List  []AdminTopicItem `json:"list"`
+}
+
+type AdminTopicUpdateReq struct {
+	TopicID  int64 `path:"id"`
+	Status   int64 `json:"status,optional,options=0|1|2"` // 0 不变
+	HotScore int64 `json:"hotScore,optional,default=-1"`  // <0 不变
+}
+
+// ---- 忧珠运营 ----
+
+type AdminYouzhuGrantReq struct {
+	UserID int64  `json:"userId"`
+	Amount int64  `json:"amount"` // 正=发放 负=回收
+	Reason string `json:"reason"` // 必填:流水备注 + 用户通知
+}
+
+type AdminYouzhuLogListReq struct {
+	UserID  int64 `form:"userId,optional"`
+	BizType int64 `form:"bizType,optional"` // 0全部 1任务 2签到 3运营 4兑换 5抽奖 6解锁
+	PageReq
+}
+
+type AdminYouzhuLogItem struct {
+	ID           int64  `json:"id"`
+	UserID       int64  `json:"userId"`
+	Nickname     string `json:"nickname"`
+	BizType      int64  `json:"bizType"`
+	BizKey       string `json:"bizKey"`
+	Amount       int64  `json:"amount"`
+	BalanceAfter int64  `json:"balanceAfter"`
+	Remark       string `json:"remark"`
+	CreatedAt    int64  `json:"createdAt"`
+}
+
+type AdminYouzhuLogListResp struct {
+	Total int64                `json:"total"`
+	List  []AdminYouzhuLogItem `json:"list"`
+}
+
+// ---- 靓号库管理 ----
+
+type AdminPrettyNoListReq struct {
+	Keyword string `form:"keyword,optional"`  // 号码模糊
+	Status  int64  `form:"status,default=-1"` // -1全部 0下架 1在售 2已售
+	PageReq
+}
+
+type AdminPrettyNoItem struct {
+	ID     int64  `json:"id"`
+	No     string `json:"no"`
+	Rarity int64  `json:"rarity"` // 1普通 2稀有 3传说
+	Price  int64  `json:"price"`
+	Status int64  `json:"status"`
+	SoldTo int64  `json:"soldTo"`
+	SoldAt int64  `json:"soldAt"` // 0=未售
+}
+
+type AdminPrettyNoListResp struct {
+	Total int64              `json:"total"`
+	List  []AdminPrettyNoItem `json:"list"`
+}
+
+type AdminPrettyNoSaveReq struct {
+	ID     int64  `json:"id,optional"`
+	No     string `json:"no"`
+	Rarity int64  `json:"rarity,options=1|2|3"`
+	Price  int64  `json:"price"`
+	Status int64  `json:"status,optional,options=0|1,default=1"` // 已售(2)不可经此修改
+}
+
+// ---- 协议静态页 ----
+
+type AgreementPathReq struct {
+	Kind string `path:"kind"` // user | privacy
+}
+
+type AgreementResp struct {
+	Kind      string `json:"kind"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+type AdminAgreementSaveReq struct {
+	Kind    string `path:"kind"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// ---- 用户等级/头衔后台调整 ----
+
+type AdminUserLevelReq struct {
+	UserID int64 `path:"id"`
+	Level  int64 `json:"level,optional,default=-1"` // <0 不变
+	Exp    int64 `json:"exp,optional,default=-1"`   // <0 不变
+}
+
+type AdminUserTitleReq struct {
+	UserID int64 `path:"id"`
+	Kind   int64 `json:"kind,options=1|2"` // 1达人 2开发者
+	Grant  bool  `json:"grant"`            // true 授予 false 撤销
 }
 
 type AuditListReq struct {
@@ -747,6 +940,8 @@ type AdminContentItem struct {
 	CircleID   int64  `json:"circleId,omitempty"` // 帖子专属
 	BizType    int64  `json:"bizType,omitempty"`  // 评论专属:1帖子 2软件
 	BizID      int64  `json:"bizId,omitempty"`    // 评论专属
+	IsTop      int64  `json:"isTop"`     // 帖子:首页置顶精选
+	IsEssence  int64  `json:"isEssence"` // 帖子:加精
 	LikeCount  int64  `json:"likeCount"`
 	ViewCount  int64  `json:"viewCount"` // 评论恒 0
 	CreatedAt  int64  `json:"createdAt"`

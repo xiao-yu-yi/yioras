@@ -121,8 +121,13 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final avatarUrl = _newAvatarUrl ?? user?.avatar ?? '';
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
-        title: const Text('编辑资料'),
+        backgroundColor: const Color(0xFFF6F7F9),
+        title: const Text(
+          '编辑资料',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -132,103 +137,178 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('保存'),
+                : const Text(
+                    '保存',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
         child: Form(
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 头像
-              Center(
-                child: GestureDetector(
-                  onTap: _pickAvatar,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: scheme.primaryContainer,
-                        foregroundImage: avatarUrl.isEmpty
-                            ? null
-                            : CachedNetworkImageProvider(avatarUrl),
-                        child: Text(
-                          (user?.nickname.isEmpty ?? true)
-                              ? '?'
-                              : user!.nickname.characters.first,
-                          style: TextStyle(
-                            fontSize: 28,
-                            color: scheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: scheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: _uploadingAvatar
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.camera_alt,
-                                  size: 14,
-                                  color: Colors.white,
+              // 头像卡片
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    GestureDetector(
+                      onTap: _pickAvatar,
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF1F2430,
+                                  ).withValues(alpha: .1),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
-                        ),
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              radius: 42,
+                              backgroundColor: const Color(0xFFEDF1FA),
+                              foregroundImage: avatarUrl.isEmpty
+                                  ? null
+                                  : CachedNetworkImageProvider(avatarUrl),
+                              child: Text(
+                                (user?.nickname.isEmpty ?? true)
+                                    ? '?'
+                                    : user!.nickname.characters.first,
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 2,
+                            bottom: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFF43F5E),
+                                    Color(0xFFFF7849),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              child: _uploadingAvatar
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.camera_alt,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '点击更换头像',
+                      style: TextStyle(fontSize: 11.5, color: scheme.outline),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 28),
-              const Text('昵称', style: TextStyle(fontSize: 13)),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _nicknameController,
-                enabled: !_saving,
-                maxLength: 30,
-                decoration: const InputDecoration(
-                  hintText: '2-30 个字符',
-                  counterText: '',
+              const SizedBox(height: 10),
+              // 资料表单卡片
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                validator: (value) {
-                  final nickname = value?.trim() ?? '';
-                  if (nickname.isEmpty) return '请输入昵称';
-                  if (nickname.length < 2) return '昵称至少 2 个字符';
-                  return null;
-                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '昵称',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _nicknameController,
+                      enabled: !_saving,
+                      maxLength: 30,
+                      decoration: const InputDecoration(
+                        hintText: '2-30 个字符',
+                        counterText: '',
+                      ),
+                      validator: (value) {
+                        final nickname = value?.trim() ?? '';
+                        if (nickname.isEmpty) return '请输入昵称';
+                        if (nickname.length < 2) return '昵称至少 2 个字符';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      '个性签名',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _signatureController,
+                      enabled: !_saving,
+                      maxLength: 100,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        hintText: '介绍一下自己吧（100 字以内）',
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              const Text('个性签名', style: TextStyle(fontSize: 13)),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _signatureController,
-                enabled: !_saving,
-                maxLength: 100,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(hintText: '介绍一下自己吧（100 字以内）'),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '头像与昵称将经过审核后全站生效',
-                style: TextStyle(fontSize: 12, color: scheme.outline),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Text(
+                  '头像与昵称将经过审核后全站生效',
+                  style: TextStyle(fontSize: 12, color: scheme.outline),
+                ),
               ),
             ],
           ),

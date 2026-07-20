@@ -9,8 +9,10 @@ type Config struct {
 	rest.RestConf
 
 	Auth struct {
-		AccessSecret string // JWT HS256 密钥,api 与 ws 网关必须一致
-		AccessExpire int64  // 秒
+		AccessSecret  string // JWT HS256 密钥,api 与 ws 网关必须一致
+		AccessExpire  int64  // 访问令牌有效期(秒)
+		RefreshExpire int64  `json:",default=2592000"` // 刷新令牌有效期(秒,默认 30 天)
+		MaxDevices    int    `json:",default=5"`       // 单账号设备上限,超出踢最久未活跃
 	}
 
 	MySQL struct {

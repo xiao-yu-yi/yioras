@@ -9,16 +9,28 @@ import (
 
 // ponytail: 仅 access token(7天),refresh token 轮换等有多端踢下线需求时再加。
 
-const ClaimUID = "uid"
+const (
+	ClaimUID = "uid"
+	ClaimDID = "did" // 设备标识,设备踢下线用;旧 token 无此 claim 时跳过设备检查
+)
 
 func GenToken(secret string, uid int64, expireSec int64) (token string, expireAt int64, err error) {
+	return GenUserToken(secret, uid, "", expireSec)
+}
+
+// GenUserToken 用户令牌(带设备标识)。
+func GenUserToken(secret string, uid int64, deviceID string, expireSec int64) (token string, expireAt int64, err error) {
 	now := time.Now()
 	expireAt = now.Add(time.Duration(expireSec) * time.Second).Unix()
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
 		ClaimUID: uid,
 		"iat":    now.Unix(),
 		"exp":    expireAt,
-	})
+	}
+	if deviceID != "" {
+		claims[ClaimDID] = deviceID
+	}
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	token, err = t.SignedString([]byte(secret))
 	return token, expireAt, err
 }

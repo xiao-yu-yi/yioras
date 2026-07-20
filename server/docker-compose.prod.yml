@@ -30,6 +30,8 @@ services:
       - ./sql/008_admin_seed.sql:/docker-entrypoint-initdb.d/008_admin_seed.sql:ro
       - ./sql/009_admin_security.sql:/docker-entrypoint-initdb.d/009_admin_security.sql:ro
       - ./sql/010_ops_mall_perm.sql:/docker-entrypoint-initdb.d/010_ops_mall_perm.sql:ro
+      - ./sql/011_admin_totp.sql:/docker-entrypoint-initdb.d/011_admin_totp.sql:ro
+      - ./sql/012_agreement.sql:/docker-entrypoint-initdb.d/012_agreement.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s

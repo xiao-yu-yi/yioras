@@ -279,6 +279,52 @@ $okAvatar = Invoke-RestMethod -Method Put -Uri "$api/user/me" -Headers $h1 -Cont
 Write-Output "[11.99] presign=code$($pre.code) putAndFetch same2KB=$same (expect True) badExt=code$($badExt.code) badSize=code$($badSize.code) (expect 40000x2) extAvatar=code$($extAvatar.code) (expect 40000) okAvatar=code$($okAvatar.code)"
 Remove-Item $tmp -ErrorAction SilentlyContinue
 
+# 12.1 batch1 ops loop: circle CRUD via admin, post feature toggle, topic ban
+$cicon = New-UploadedImage "$adm/upload/presign" $ha "circle"
+$nc1 = PostJson "$adm/circles" @{name = "OpsCircle"; icon = $cicon; intro = "made by admin"} $ha
+$discover = (Invoke-RestMethod "$api/circles").data
+$cSeen = @($discover | Where-Object { $_.name -eq 'OpsCircle' }).Count
+PostJson "$adm/circles" @{id = $nc1.data.id; name = "OpsCircle"; icon = $cicon; status = 2} $ha | Out-Null
+$discover2 = (Invoke-RestMethod "$api/circles").data
+$cGone = @($discover2 | Where-Object { $_.name -eq 'OpsCircle' }).Count
+$featured = PostJson "$adm/posts/$($target.data.postId)/ops" @{isTop = 1} $ha
+$homeTop = (Invoke-RestMethod "$api/home/config").data
+$topSeen = @($homeTop.topPosts | Where-Object { $_.postId -eq $target.data.postId }).Count
+PostJson "$adm/posts/$($target.data.postId)/ops" @{isTop = 0} $ha | Out-Null
+$tps = (Invoke-RestMethod "$adm/topics" -Headers $ha).data
+Write-Output "[12.1] circle add=code$($nc1.code) seen=$cSeen->$cGone (expect 1->0); postTop=code$($featured.code) homeTop=$topSeen (expect 1); topics=$($tps.total)"
+
+# 12.2 batch2 mall ops: youzhu grant + admin ledger, pretty-no sku CRUD
+$grant = PostJson "$adm/youzhu/grant" @{userId = $uidB; amount = 300; reason = "smoke bonus"} $ha
+$ylogs = (Invoke-RestMethod "$adm/youzhu/logs?userId=$uidB&bizType=3" -Headers $ha).data
+$np2 = PostJson "$adm/mall/prettynos" @{no = "N10001"; rarity = 1; price = 20} $ha
+$dupNo = PostJson "$adm/mall/prettynos" @{no = "N10001"; rarity = 1; price = 20} $ha
+$userNos = (Invoke-RestMethod "$api/mall/pretty-no" -Headers $h1).data
+$noSeen = @($userNos | Where-Object { $_.no -eq 'N10001' }).Count
+PostJson "$adm/mall/prettynos" @{id = $np2.data.id; no = "N10001"; rarity = 1; price = 20; status = 0} $ha | Out-Null
+$userNos2 = (Invoke-RestMethod "$api/mall/pretty-no" -Headers $h1).data
+$noGone = @($userNos2 | Where-Object { $_.no -eq 'N10001' }).Count
+Write-Output "[12.2] grant=code$($grant.code) opsLedger=$($ylogs.total) (>=1); prettyNo add=code$($np2.code) dup=code$($dupNo.code) (expect 42900) shop=$noSeen->$noGone (expect 1->0)"
+
+# 12.3 batch3 dual token: refresh rotation, replay reject, device kick
+$reg3 = PostJson "$api/auth/login" @{email = "a@test.com"; password = "pass1234"; deviceName = "PhoneA"} $null
+$ref3 = PostJson "$api/auth/refresh" @{refreshToken = $reg3.data.refreshToken; deviceId = $reg3.data.deviceId} $null
+$replay3 = PostJson "$api/auth/refresh" @{refreshToken = $reg3.data.refreshToken; deviceId = $reg3.data.deviceId} $null
+$hA3 = @{Authorization = "Bearer $($ref3.data.token)"}
+$devs3 = (Invoke-RestMethod "$api/user/devices" -Headers $hA3).data
+$lg4 = PostJson "$api/auth/login" @{email = "a@test.com"; password = "pass1234"; deviceName = "PadB"} $null
+Invoke-RestMethod -Method Delete -Uri "$api/user/devices/$($lg4.data.deviceId)" -Headers $hA3 | Out-Null
+$kicked3 = Invoke-RestMethod "$api/user/me" -Headers @{Authorization = "Bearer $($lg4.data.token)"}
+Write-Output "[12.3] refresh=code$($ref3.code) rotated=$($ref3.data.refreshToken -ne $reg3.data.refreshToken) replay=code$($replay3.code) (expect 40100) devices=$(@($devs3).Count) kickedAccess=code$($kicked3.code) (expect 40100)"
+
+# 12.4 batch4 compliance: agreement read/edit, user level/title adjust
+$agr = (Invoke-RestMethod "$api/agreements/privacy").data
+PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null
+$profB2 = (Invoke-RestMethod "$api/users/$uidB").data
+$ttl = PostJson "$adm/users/$uidB/title" @{kind = 1; grant = $true} $ha
+$profB3 = (Invoke-RestMethod "$api/users/$uidB").data
+Write-Output "[12.4] agreement=$([bool]$agr.title) level9=$($profB2.level) (expect 9) title=code$($ttl.code) certs=$(($profB3.certs -join ',')) (contains 1)"
+
 # 12. dashboard + op logs recorded
 $dash = (Invoke-RestMethod "$adm/dashboard" -Headers $ha).data
 $logs = (Invoke-RestMethod "$adm/oplogs" -Headers $ha).data

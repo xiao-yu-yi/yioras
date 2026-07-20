@@ -32,6 +32,12 @@ export default [
         name: "Certs",
         component: () => import("@/views/yiora/CertsView.vue"),
         meta: { title: "认证审核", icon: "ep/medal" }
+      },
+      {
+        path: "/topics",
+        name: "Topics",
+        component: () => import("@/views/yiora/TopicsView.vue"),
+        meta: { title: "话题管理", icon: "ep/collection-tag" }
       }
     ]
   },
@@ -62,6 +68,12 @@ export default [
     },
     children: [
       {
+        path: "/circles",
+        name: "Circles",
+        component: () => import("@/views/yiora/CirclesView.vue"),
+        meta: { title: "圈子管理", icon: "ep/place" }
+      },
+      {
         path: "/banners",
         name: "Banners",
         component: () => import("@/views/yiora/BannersView.vue"),
@@ -84,6 +96,12 @@ export default [
         name: "Categories",
         component: () => import("@/views/yiora/CategoriesView.vue"),
         meta: { title: "软件分类", icon: "ep/menu" }
+      },
+      {
+        path: "/youzhu",
+        name: "Youzhu",
+        component: () => import("@/views/yiora/YouzhuView.vue"),
+        meta: { title: "忧珠运营", icon: "ep/coin" }
       }
     ]
   },
@@ -130,6 +148,12 @@ export default [
         name: "Security",
         component: () => import("@/views/yiora/SecurityView.vue"),
         meta: { title: "安全设置", icon: "ep/lock" }
+      },
+      {
+        path: "/agreements",
+        name: "Agreements",
+        component: () => import("@/views/yiora/AgreementsView.vue"),
+        meta: { title: "协议管理", icon: "ep/reading" }
       },
       {
         path: "/oplogs",

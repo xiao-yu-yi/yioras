@@ -64,14 +64,18 @@ class _ProfileBody extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 180,
+            expandedHeight: 190,
             foregroundColor: Colors.white,
             backgroundColor: scheme.primary,
-            title: Text(profile.nickname),
+            title: Text(
+              profile.nickname,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -85,12 +89,13 @@ class _ProfileBody extends ConsumerWidget {
                     )
                   else
                     Container(color: scheme.primary),
+                  // 顶部轻压暗保证返回键可见
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black54],
+                        colors: [Colors.black26, Colors.transparent],
                       ),
                     ),
                   ),
@@ -100,9 +105,14 @@ class _ProfileBody extends ConsumerWidget {
           ),
           SliverToBoxAdapter(child: _InfoSection(profile: profile)),
           if (profile.posts.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: Text('TA 还没有发布过内容')),
+              child: Center(
+                child: Text(
+                  '这里空空如也',
+                  style: TextStyle(fontSize: 13, color: scheme.outline),
+                ),
+              ),
             )
           else
             SliverPadding(
@@ -110,7 +120,7 @@ class _ProfileBody extends ConsumerWidget {
               sliver: SliverList.separated(
                 itemCount: profile.posts.length,
                 separatorBuilder: (context, index) =>
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final post = profile.posts[index];
                   return PostCard(
@@ -148,19 +158,31 @@ class _InfoSection extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: scheme.primaryContainer,
-                foregroundImage: profile.avatar.isEmpty
-                    ? null
-                    : CachedNetworkImageProvider(profile.avatar),
-                child: Text(
-                  profile.nickname.isEmpty
-                      ? '?'
-                      : profile.nickname.characters.first,
-                  style: TextStyle(
-                    fontSize: 22,
-                    color: scheme.onPrimaryContainer,
+              // 白圈骑缝头像（与我的页同语言）
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1F2430).withValues(alpha: .1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 32,
+                  backgroundColor: const Color(0xFFEDF1FA),
+                  foregroundImage: profile.avatar.isEmpty
+                      ? null
+                      : CachedNetworkImageProvider(profile.avatar),
+                  child: Text(
+                    profile.nickname.isEmpty
+                        ? '?'
+                        : profile.nickname.characters.first,
+                    style: TextStyle(fontSize: 22, color: scheme.primary),
                   ),
                 ),
               ),
@@ -177,64 +199,77 @@ class _InfoSection extends ConsumerWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
+                        // 深色 Lv 徽章（与我的页同款）
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
+                            horizontal: 8,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
-                            color: scheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(4),
+                            color: const Color(0xFF273043),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             'Lv.${profile.level}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: scheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFFFD666),
+                              height: 1.2,
                             ),
                           ),
                         ),
                         if (profile.badge.isNotEmpty) ...[
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
+                              horizontal: 7,
+                              vertical: 2.5,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFFFB020,
-                              ).withValues(alpha: .15),
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFFFFF3DC),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               profile.badge,
                               style: const TextStyle(
                                 fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFB07800),
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFA36A00),
+                                height: 1.2,
                               ),
                             ),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'ID: ${profile.displayNo}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant,
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F8),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        profile.displayNo,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       profile.signature.isEmpty
                           ? '这个人很懒，什么都没留下'
@@ -251,7 +286,7 @@ class _InfoSection extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             children: [
               _StatItem(label: '关注', value: profile.followCount),
@@ -260,46 +295,85 @@ class _InfoSection extends ConsumerWidget {
               _StatItem(label: '帖子', value: profile.postCount),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          // 操作区（文档 3.8 他人视角：关注 / 私信），胶囊化对齐全站按钮语言
           Row(
             children: [
               Expanded(
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                    backgroundColor: following
-                        ? scheme.surfaceContainerHighest
-                        : scheme.primary,
-                    foregroundColor: following
-                        ? scheme.onSurfaceVariant
-                        : Colors.white,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: following
+                        ? null
+                        : const LinearGradient(
+                            colors: [Color(0xFFF43F5E), Color(0xFFFF7849)],
+                          ),
+                    color: following ? const Color(0xFFF3F4F8) : null,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: following
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: const Color(
+                                0xFFF43F5E,
+                              ).withValues(alpha: .3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                   ),
-                  onPressed: busy
-                      ? null
-                      : () async {
-                          try {
-                            await followNotifier.toggle(
-                              profile.id,
-                              currentlyFollowing: following,
-                            );
-                          } on ApiException catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(content: Text(e.message)),
-                                );
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(42),
+                      backgroundColor: Colors.transparent,
+                      disabledBackgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      foregroundColor: following
+                          ? scheme.onSurfaceVariant
+                          : Colors.white,
+                      textStyle: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            try {
+                              await followNotifier.toggle(
+                                profile.id,
+                                currentlyFollowing: following,
+                              );
+                            } on ApiException catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(content: Text(e.message)),
+                                  );
+                              }
                             }
-                          }
-                        },
-                  child: Text(following ? '已关注' : '+ 关注'),
+                          },
+                    child: Text(following ? '已关注' : '+ 关注'),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
+                    minimumSize: const Size.fromHeight(42),
+                    side: const BorderSide(
+                      color: Color(0xFFECEDF2),
+                      width: 1.2,
+                    ),
+                    foregroundColor: scheme.onSurface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   onPressed: () => _openChat(context, ref),
                   child: const Text('私信'),
@@ -307,11 +381,10 @@ class _InfoSection extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Divider(color: scheme.outlineVariant.withValues(alpha: .5)),
-          Text(
+          const SizedBox(height: 16),
+          const Text(
             'TA 的作品',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -350,13 +423,14 @@ class _StatItem extends StatelessWidget {
         children: [
           Text(
             formatCount(value),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+            ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
-          ),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(fontSize: 11, color: scheme.outline)),
         ],
       ),
     );

@@ -11,6 +11,7 @@
       <el-radio-button value="deco">装扮商品</el-radio-button>
       <el-radio-button value="prize">抽奖奖池</el-radio-button>
       <el-radio-button value="task">任务配置</el-radio-button>
+      <el-radio-button value="prettyno">靓号库</el-radio-button>
     </el-radio-group>
 
     <!-- 装扮 -->
@@ -95,6 +96,38 @@
       </el-table-column>
     </el-table>
 
+    <!-- 靓号 -->
+    <el-table v-if="tab === 'prettyno'" :data="prettynos" v-loading="loading">
+      <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column prop="no" label="号码" min-width="120" />
+      <el-table-column label="稀有度" width="90">
+        <template #default="{ row }">
+          <el-tag :type="(['', 'info', 'warning', 'danger'] as const)[row.rarity] || 'info'" effect="plain">
+            {{ ['', '普通', '稀有', '传说'][row.rarity] }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="价格" width="100">
+        <template #default="{ row }">{{ row.price }} 忧珠</template>
+      </el-table-column>
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <el-tag :type="(['info', 'success', 'warning'] as const)[row.status] || 'info'">
+            {{ ['下架', '在售', '已售'][row.status] }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="购买人" width="100">
+        <template #default="{ row }">{{ row.soldTo ? '#' + row.soldTo : '-' }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button v-if="row.status !== 2" size="small" @click="openEdit(row)">编辑</el-button>
+          <span v-else class="sub">已成交</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
     <!-- 装扮弹窗 -->
     <el-dialog v-model="decoDialog" :title="decoForm.id ? '编辑装扮' : '新增装扮'" width="460px">
       <el-form label-width="90px">
@@ -152,6 +185,28 @@
       </template>
     </el-dialog>
 
+    <!-- 靓号弹窗 -->
+    <el-dialog v-model="prettyDialog" :title="prettyForm.id ? '编辑靓号' : '新增靓号'" width="420px">
+      <el-form label-width="90px">
+        <el-form-item label="号码" required>
+          <el-input v-model="prettyForm.no" maxlength="20" placeholder="N 开头+数字,如 N88888" />
+        </el-form-item>
+        <el-form-item label="稀有度">
+          <el-select v-model="prettyForm.rarity" style="width: 100%">
+            <el-option :value="1" label="普通" />
+            <el-option :value="2" label="稀有" />
+            <el-option :value="3" label="传说" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="价格(忧珠)"><el-input-number v-model="prettyForm.price" :min="1" /></el-form-item>
+        <el-form-item label="状态"><el-switch v-model="enabled" active-text="在售" inactive-text="下架" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="prettyDialog = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="savePretty">保存并生效</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 任务弹窗 -->
     <el-dialog v-model="taskDialog" :title="taskForm.id ? '编辑任务' : '新增任务'" width="460px">
       <el-form label-width="100px">
@@ -184,16 +239,17 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api, type AdminDecoItem, type AdminPrizeItem, type AdminTaskCfgItem } from '@/api/yiora'
+import { api, type AdminDecoItem, type AdminPrettyNoItem, type AdminPrizeItem, type AdminTaskCfgItem } from '@/api/yiora'
 import UploadImage from '@/components/UploadImage.vue'
 
-const tabNames: Record<string, string> = { deco: '装扮', prize: '奖品', task: '任务' }
+const tabNames: Record<string, string> = { deco: '装扮', prize: '奖品', task: '任务', prettyno: '靓号' }
 const actionNames: Record<string, string> = { post: '发帖', comment: '评论', like: '点赞', browse: '浏览' }
 
-const tab = ref<'deco' | 'prize' | 'task'>('deco')
+const tab = ref<'deco' | 'prize' | 'task' | 'prettyno'>('deco')
 const decos = ref<AdminDecoItem[]>([])
 const prizes = ref<AdminPrizeItem[]>([])
 const tasks = ref<AdminTaskCfgItem[]>([])
+const prettynos = ref<AdminPrettyNoItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const enabled = ref(true)
@@ -201,9 +257,11 @@ const enabled = ref(true)
 const decoDialog = ref(false)
 const prizeDialog = ref(false)
 const taskDialog = ref(false)
+const prettyDialog = ref(false)
 const decoForm = reactive<Partial<AdminDecoItem>>({})
 const prizeForm = reactive<Partial<AdminPrizeItem>>({})
 const taskForm = reactive<Partial<AdminTaskCfgItem>>({})
+const prettyForm = reactive<Partial<AdminPrettyNoItem>>({})
 
 async function load() {
   loading.value = true
@@ -212,13 +270,14 @@ async function load() {
     else if (tab.value === 'prize') {
       // 奖池弹窗选装扮需要装扮清单
       ;[prizes.value, decos.value] = await Promise.all([api.mallPrizes(), api.mallDecos()])
-    } else tasks.value = await api.mallTasks()
+    } else if (tab.value === 'task') tasks.value = await api.mallTasks()
+    else prettynos.value = (await api.prettyNos({ status: -1, page: 1, size: 50 })).list
   } finally {
     loading.value = false
   }
 }
 
-function openEdit(row?: AdminDecoItem | AdminPrizeItem | AdminTaskCfgItem) {
+function openEdit(row?: AdminDecoItem | AdminPrizeItem | AdminTaskCfgItem | AdminPrettyNoItem) {
   enabled.value = (row?.status ?? 1) === 1
   if (tab.value === 'deco') {
     Object.assign(decoForm, row ?? { id: 0, kind: 1, name: '', preview: '', price: 0, durationDays: 0, sort: 0 })
@@ -226,9 +285,28 @@ function openEdit(row?: AdminDecoItem | AdminPrizeItem | AdminTaskCfgItem) {
   } else if (tab.value === 'prize') {
     Object.assign(prizeForm, row ?? { id: 0, name: '', kind: 1, refId: undefined, amount: 5, weight: 10, stock: -1 })
     prizeDialog.value = true
-  } else {
+  } else if (tab.value === 'task') {
     Object.assign(taskForm, row ?? { id: 0, name: '', type: 1, action: 'post', targetCount: 1, rewardYouzhu: 5, rewardExp: 5, sort: 0 })
     taskDialog.value = true
+  } else {
+    Object.assign(prettyForm, row ?? { id: 0, no: '', rarity: 1, price: 50 })
+    prettyDialog.value = true
+  }
+}
+
+async function savePretty() {
+  if (!prettyForm.no?.trim()) {
+    ElMessage.warning('请输入号码')
+    return
+  }
+  saving.value = true
+  try {
+    await api.savePrettyNo({ ...prettyForm, no: prettyForm.no.trim().toUpperCase(), status: enabled.value ? 1 : 0 })
+    ElMessage.success('已保存,靓号商城即时生效')
+    prettyDialog.value = false
+    load()
+  } finally {
+    saving.value = false
   }
 }
 

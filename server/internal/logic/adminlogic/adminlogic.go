@@ -592,6 +592,99 @@ func (l *Logic) DecideCert(ctx context.Context, adminID int64, req *types.CertDe
 	return nil
 }
 
+// Circles 后台圈子列表。
+func (l *Logic) Circles(ctx context.Context, req *types.AdminCircleListReq) (*types.AdminCircleListResp, error) {
+	offset, limit := req.Offset()
+	total, rows, err := l.svcCtx.AdminModel.ListCirclesAdmin(ctx, strings.TrimSpace(req.Keyword), offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &types.AdminCircleListResp{Total: total, List: make([]types.AdminCircleItem, 0, len(rows))}
+	for _, c := range rows {
+		out.List = append(out.List, types.AdminCircleItem{
+			ID: c.ID, Name: c.Name, Icon: c.Icon, Cover: c.Cover, Intro: c.Intro, Description: c.Description,
+			MemberCount: c.MemberCount, PostCount: c.PostCount, IsOfficial: c.IsOfficial,
+			Pinned: c.Pinned, Sort: c.Sort, Status: c.Status,
+		})
+	}
+	return out, nil
+}
+
+// SaveCircle 新建/更新圈子(名称唯一;图标必须直传)。
+func (l *Logic) SaveCircle(ctx context.Context, adminID int64, req *types.AdminCircleSaveReq, ip string) (int64, error) {
+	name := strings.TrimSpace(req.Name)
+	if name == "" || len([]rune(name)) > 30 {
+		return 0, xerr.Param("圈子名长度需为 1-30 字符")
+	}
+	if !uploadlogic.AllowedImageURL(l.svcCtx.Config, req.Icon) {
+		return 0, xerr.Param("圈子图标链接不合法,请通过上传获取")
+	}
+	if req.Cover != "" && !uploadlogic.AllowedImageURL(l.svcCtx.Config, req.Cover) {
+		return 0, xerr.Param("封面链接不合法,请通过上传获取")
+	}
+	id, ok, err := l.svcCtx.AdminModel.SaveCircleAdmin(ctx, &model.AdminCircleRow{
+		ID: req.ID, Name: name, Icon: req.Icon, Cover: req.Cover,
+		Intro: strings.TrimSpace(req.Intro), Description: strings.TrimSpace(req.Description),
+		IsOfficial: req.IsOfficial, Pinned: req.Pinned, Sort: req.Sort, Status: req.Status,
+	})
+	if err != nil {
+		if errors.Is(err, model.ErrCircleExists) {
+			return 0, xerr.New(xerr.CodeTooFrequent, "圈子名已存在")
+		}
+		return 0, err
+	}
+	if !ok {
+		return 0, xerr.New(xerr.CodeNotFound, "圈子不存在")
+	}
+	l.opLog(ctx, adminID, "circle.save", fmt.Sprintf("circle:%d status:%d", id, req.Status), "", ip)
+	return id, nil
+}
+
+// PostOps 帖子运营位:首页置顶/加精。
+func (l *Logic) PostOps(ctx context.Context, adminID int64, req *types.AdminPostOpsReq, ip string) error {
+	ok, err := l.svcCtx.AdminModel.SetPostOps(ctx, req.PostID, req.IsTop, req.IsEssence)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return xerr.New(xerr.CodeNotFound, "帖子不存在或未发布")
+	}
+	l.opLog(ctx, adminID, "content.postops",
+		fmt.Sprintf("post:%d top:%d essence:%d", req.PostID, req.IsTop, req.IsEssence), "", ip)
+	return nil
+}
+
+// Topics 后台话题列表。
+func (l *Logic) Topics(ctx context.Context, req *types.AdminTopicListReq) (*types.AdminTopicListResp, error) {
+	offset, limit := req.Offset()
+	total, rows, err := l.svcCtx.AdminModel.ListTopicsAdmin(ctx, strings.TrimSpace(req.Keyword), req.Status, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &types.AdminTopicListResp{Total: total, List: make([]types.AdminTopicItem, 0, len(rows))}
+	for _, t := range rows {
+		out.List = append(out.List, types.AdminTopicItem{
+			ID: t.ID, Name: t.Name, PostCount: t.PostCount, HotScore: t.HotScore,
+			Status: t.Status, CreatedAt: t.CreatedAt.UnixMilli(),
+		})
+	}
+	return out, nil
+}
+
+// UpdateTopic 话题封禁/恢复/热度调整。
+func (l *Logic) UpdateTopic(ctx context.Context, adminID int64, req *types.AdminTopicUpdateReq, ip string) error {
+	ok, err := l.svcCtx.AdminModel.UpdateTopicAdmin(ctx, req.TopicID, req.Status, req.HotScore)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return xerr.New(xerr.CodeNotFound, "话题不存在")
+	}
+	l.opLog(ctx, adminID, "content.topic",
+		fmt.Sprintf("topic:%d status:%d hot:%d", req.TopicID, req.Status, req.HotScore), "", ip)
+	return nil
+}
+
 // Appoint 圈主/管理员任命。
 func (l *Logic) Appoint(ctx context.Context, adminID int64, req *types.AppointReq, ip string) error {
 	if _, err := l.svcCtx.CircleModel.FindByID(ctx, req.CircleID); err != nil {
@@ -654,6 +747,86 @@ func (l *Logic) PublishNotice(ctx context.Context, adminID int64, req *types.Adm
 	return nil
 }
 
+// Agreement 协议内容(用户侧/后台共用读取)。
+func (l *Logic) Agreement(ctx context.Context, kind string) (*types.AgreementResp, error) {
+	if kind != "user" && kind != "privacy" {
+		return nil, xerr.Param("协议类型不存在")
+	}
+	row, err := l.svcCtx.AdminModel.GetAgreement(ctx, kind)
+	if err != nil {
+		if model.IsNotFound(err) {
+			return nil, xerr.New(xerr.CodeNotFound, "协议不存在")
+		}
+		return nil, fmt.Errorf("get agreement: %w", err)
+	}
+	return &types.AgreementResp{
+		Kind: row.Kind, Title: row.Title, Content: row.Content, UpdatedAt: row.UpdatedAt.UnixMilli(),
+	}, nil
+}
+
+// SaveAgreement 后台编辑协议。
+func (l *Logic) SaveAgreement(ctx context.Context, adminID int64, req *types.AdminAgreementSaveReq, ip string) error {
+	if req.Kind != "user" && req.Kind != "privacy" {
+		return xerr.Param("协议类型不存在")
+	}
+	title := strings.TrimSpace(req.Title)
+	content := strings.TrimSpace(req.Content)
+	if title == "" || content == "" {
+		return xerr.Param("标题与正文不能为空")
+	}
+	if err := l.svcCtx.AdminModel.SaveAgreement(ctx, req.Kind, title, content); err != nil {
+		return err
+	}
+	l.opLog(ctx, adminID, "ops.agreement", "agreement:"+req.Kind, "", ip)
+	return nil
+}
+
+// SetUserLevel 后台调整用户等级/经验。
+func (l *Logic) SetUserLevel(ctx context.Context, adminID int64, req *types.AdminUserLevelReq, ip string) error {
+	if req.Level < -1 || req.Level > 100 || req.Exp > 100000000 {
+		return xerr.Param("等级需在 0-100,经验需在 1 亿以内")
+	}
+	ok, err := l.svcCtx.AdminModel.SetUserLevel(ctx, req.UserID, req.Level, req.Exp)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return xerr.New(xerr.CodeNotFound, "用户不存在或已注销")
+	}
+	l.opLog(ctx, adminID, "user.level",
+		fmt.Sprintf("user:%d level:%d exp:%d", req.UserID, req.Level, req.Exp), "", ip)
+	return nil
+}
+
+// GrantUserTitle 授予/撤销头衔(达人/开发者认证徽章)。
+func (l *Logic) GrantUserTitle(ctx context.Context, adminID int64, req *types.AdminUserTitleReq, ip string) error {
+	if _, err := l.svcCtx.UserModel.FindByID(ctx, req.UserID); err != nil {
+		if model.IsNotFound(err) {
+			return xerr.New(xerr.CodeNotFound, "用户不存在")
+		}
+		return fmt.Errorf("find user: %w", err)
+	}
+	if err := l.svcCtx.AdminModel.GrantTitle(ctx, req.UserID, req.Kind, req.Grant); err != nil {
+		return err
+	}
+	noun := "达人认证"
+	if req.Kind == 2 {
+		noun = "开发者认证"
+	}
+	text := "管理员已授予你" + noun + "头衔"
+	if !req.Grant {
+		text = "你的" + noun + "头衔已被撤销"
+	}
+	if err := l.svcCtx.NotifyModel.Add(ctx, &model.Notification{
+		UserID: req.UserID, Type: model.NotifyTypeSystem, Content: text,
+	}); err != nil {
+		logx.WithContext(ctx).Errorf("title notification: %v", err)
+	}
+	l.opLog(ctx, adminID, "user.title",
+		fmt.Sprintf("user:%d kind:%d grant:%t", req.UserID, req.Kind, req.Grant), "", ip)
+	return nil
+}
+
 // Users 后台用户搜索列表(昵称/编号/邮箱模糊 + 状态筛选,分页带 total)。
 func (l *Logic) Users(ctx context.Context, req *types.AdminUserListReq) (*types.AdminUserListResp, error) {
 	offset, limit := req.Offset()
@@ -698,6 +871,7 @@ func (l *Logic) Contents(ctx context.Context, req *types.AdminContentListReq) (*
 			ID: r.ID, AuthorID: r.UserID, AuthorName: r.Nickname,
 			Title: r.Title, Content: truncateRunes(r.Content, 120), Status: r.Status,
 			CircleID: r.CircleID, BizType: r.BizType, BizID: r.BizID,
+			IsTop: r.IsTop, IsEssence: r.IsEssence,
 			LikeCount: r.LikeCount, ViewCount: r.ViewCount, CreatedAt: r.CreatedAt.UnixMilli(),
 		})
 	}
@@ -1164,6 +1338,116 @@ func (l *Logic) SavePrize(ctx context.Context, adminID int64, req *types.AdminPr
 		return 0, xerr.New(xerr.CodeNotFound, "奖品不存在")
 	}
 	l.opLog(ctx, adminID, "ops.mall.prize", fmt.Sprintf("prize:%d weight:%d stock:%d status:%d", id, req.Weight, req.Stock, req.Status), "", ip)
+	return id, nil
+}
+
+// GrantYouzhu 忧珠运营发放/回收:复用幂等账本(YouzhuBizOps),通知用户,留痕。
+func (l *Logic) GrantYouzhu(ctx context.Context, adminID int64, req *types.AdminYouzhuGrantReq, ip string) error {
+	if req.Amount == 0 || req.Amount < -100000 || req.Amount > 100000 {
+		return xerr.Param("发放/回收数量需在 ±100000 以内且不为 0")
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return xerr.Param("必须填写发放/回收原因")
+	}
+	u, err := l.svcCtx.UserModel.FindByID(ctx, req.UserID)
+	if err != nil {
+		if model.IsNotFound(err) {
+			return xerr.New(xerr.CodeNotFound, "用户不存在")
+		}
+		return fmt.Errorf("find user: %w", err)
+	}
+	if u.Status == 4 {
+		return xerr.New(xerr.CodeNotFound, "用户已注销")
+	}
+	bizKey := fmt.Sprintf("ops:grant:%d:%d", adminID, time.Now().UnixNano())
+	if _, err := l.svcCtx.YouzhuModel.Change(ctx, req.UserID, model.YouzhuBizOps, bizKey, req.Amount, "运营: "+reason); err != nil {
+		if errors.Is(err, model.ErrInsufficientBalance) {
+			return xerr.Param("回收失败:用户忧珠余额不足")
+		}
+		return fmt.Errorf("ops grant: %w", err)
+	}
+	text := fmt.Sprintf("运营发放 %d 忧珠: %s", req.Amount, reason)
+	if req.Amount < 0 {
+		text = fmt.Sprintf("运营回收 %d 忧珠: %s", -req.Amount, reason)
+	}
+	if err := l.svcCtx.NotifyModel.Add(ctx, &model.Notification{
+		UserID: req.UserID, Type: model.NotifyTypeSystem, Content: text,
+	}); err != nil {
+		logx.WithContext(ctx).Errorf("grant notification: %v", err)
+	}
+	l.opLog(ctx, adminID, "ops.youzhu.grant",
+		fmt.Sprintf("user:%d amount:%d", req.UserID, req.Amount), reason, ip)
+	return nil
+}
+
+// YouzhuLogs 后台忧珠流水查询。
+func (l *Logic) YouzhuLogs(ctx context.Context, req *types.AdminYouzhuLogListReq) (*types.AdminYouzhuLogListResp, error) {
+	offset, limit := req.Offset()
+	total, rows, err := l.svcCtx.AdminModel.ListYouzhuLogsAdmin(ctx, req.UserID, req.BizType, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &types.AdminYouzhuLogListResp{Total: total, List: make([]types.AdminYouzhuLogItem, 0, len(rows))}
+	for _, r := range rows {
+		out.List = append(out.List, types.AdminYouzhuLogItem{
+			ID: r.ID, UserID: r.UserID, Nickname: r.Nickname, BizType: r.BizType, BizKey: r.BizKey,
+			Amount: r.Amount, BalanceAfter: r.BalanceAfter, Remark: r.Remark, CreatedAt: r.CreatedAt.UnixMilli(),
+		})
+	}
+	return out, nil
+}
+
+// PrettyNos 后台靓号库列表。
+func (l *Logic) PrettyNos(ctx context.Context, req *types.AdminPrettyNoListReq) (*types.AdminPrettyNoListResp, error) {
+	offset, limit := req.Offset()
+	total, rows, err := l.svcCtx.AdminModel.ListPrettyNosAdmin(ctx, strings.TrimSpace(req.Keyword), req.Status, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &types.AdminPrettyNoListResp{Total: total, List: make([]types.AdminPrettyNoItem, 0, len(rows))}
+	for _, p := range rows {
+		item := types.AdminPrettyNoItem{
+			ID: p.ID, No: p.No, Rarity: p.Rarity, Price: p.Price, Status: p.Status, SoldTo: p.SoldTo,
+		}
+		if p.SoldAt.Valid {
+			item.SoldAt = p.SoldAt.Time.UnixMilli()
+		}
+		out.List = append(out.List, item)
+	}
+	return out, nil
+}
+
+// SavePrettyNo 新增/修改靓号 SKU(号码 N+数字,已售不可改)。
+func (l *Logic) SavePrettyNo(ctx context.Context, adminID int64, req *types.AdminPrettyNoSaveReq, ip string) (int64, error) {
+	no := strings.ToUpper(strings.TrimSpace(req.No))
+	if len(no) < 2 || len(no) > 20 || no[0] != 'N' {
+		return 0, xerr.Param("号码格式应为 N 开头,如 N88888")
+	}
+	for _, c := range no[1:] {
+		if c < '0' || c > '9' {
+			return 0, xerr.Param("号码 N 之后只能是数字")
+		}
+	}
+	if req.Price <= 0 {
+		return 0, xerr.Param("价格需大于 0")
+	}
+	id, ok, err := l.svcCtx.AdminModel.SavePrettyNoAdmin(ctx, &model.AdminPrettyNoRow{
+		ID: req.ID, No: no, Rarity: req.Rarity, Price: req.Price, Status: req.Status,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, model.ErrPrettyNoExists):
+			return 0, xerr.New(xerr.CodeTooFrequent, "该号码已存在")
+		case errors.Is(err, model.ErrPrettyNoSold):
+			return 0, xerr.New(xerr.CodeForbidden, "已售出的靓号不可修改")
+		}
+		return 0, err
+	}
+	if !ok {
+		return 0, xerr.New(xerr.CodeNotFound, "靓号不存在")
+	}
+	l.opLog(ctx, adminID, "ops.mall.prettyno", fmt.Sprintf("sku:%d no:%s price:%d status:%d", id, no, req.Price, req.Status), "", ip)
 	return id, nil
 }
 

@@ -223,6 +223,13 @@ curl -X POST localhost:8888/api/v1/upload/presign -H "Authorization: Bearer $T" 
 # 演示态一键重置(admin 回 admin123+强制改密,TOTP/锁定/票据全清,业务数据不动):
 #   powershell -File .\scripts\demo-reset.ps1
 
+# 双令牌与设备管理(3.1):登录/注册可传 deviceName,响应含 refreshToken(30 天)/deviceId
+curl -X POST localhost:8888/api/v1/auth/refresh -H "Content-Type: application/json" \
+  -d '{"refreshToken":"...","deviceId":"..."}'   # 轮换刷新:旧 RT 一次性作废,发新 access+refresh 对
+curl localhost:8888/api/v1/user/devices -H "Authorization: Bearer $T"        # 登录设备列表(current 标记)
+curl -X DELETE localhost:8888/api/v1/user/devices/<did> -H "Authorization: Bearer $T" # 踢设备:存量 access+refresh 即时失效
+# 设备上限 Auth.MaxDevices(默认 5),超出自动踢最久未活跃;协议静态页 GET /api/v1/agreements/{user|privacy}
+
 ## 回归冒烟基线(发版前必跑)
 
 ```powershell

@@ -133,14 +133,6 @@ class _ProfileHeader extends ConsumerWidget {
             ),
             Positioned(
               top: MediaQuery.paddingOf(context).top + 6,
-              left: 12,
-              child: _FrostedCircleButton(
-                icon: Icons.qr_code_scanner_rounded,
-                onTap: () => _comingSoon(context, '扫一扫'),
-              ),
-            ),
-            Positioned(
-              top: MediaQuery.paddingOf(context).top + 6,
               right: 12,
               child: Row(
                 children: [
