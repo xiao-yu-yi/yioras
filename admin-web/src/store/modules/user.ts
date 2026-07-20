@@ -56,7 +56,8 @@ export const useUserStore = defineStore("pure-user", {
       setToken({
         accessToken: res.token,
         refreshToken: res.token,
-        expires: new Date(res.expireAt),
+        // 后端 expireAt 为秒级 Unix,模板按毫秒时间戳比较
+        expires: new Date(res.expireAt * 1000),
         username: res.username,
         nickname: res.username,
         roles: ["admin"],
