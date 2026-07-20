@@ -32,6 +32,8 @@ type (
 		RejectReason  string    `db:"reject_reason"`
 		IsTop         int64     `db:"is_top"`
 		IsEssence     int64     `db:"is_essence"`
+		IsRedTitle    int64     `db:"is_red_title"`
+		IsSink        int64     `db:"is_sink"`
 		CircleTop     int64     `db:"circle_top"`
 		ViewCount     int64     `db:"view_count"`
 		LikeCount     int64     `db:"like_count"`
@@ -54,10 +56,10 @@ type (
 	PostModel struct{ conn sqlx.SqlConn }
 )
 
-const postCols = "id, user_id, circle_id, title, content, link_type, link_url, visibility, status, reject_reason, is_top, is_essence, circle_top, view_count, like_count, comment_count, favorite_count, hot_score, created_at, updated_at"
+const postCols = "id, user_id, circle_id, title, content, link_type, link_url, visibility, status, reject_reason, is_top, is_essence, is_red_title, is_sink, circle_top, view_count, like_count, comment_count, favorite_count, hot_score, created_at, updated_at"
 
 // postColsP 带 p. 前缀的列清单(join 查询用)。
-const postColsP = "p.id, p.user_id, p.circle_id, p.title, p.content, p.link_type, p.link_url, p.visibility, p.status, p.reject_reason, p.is_top, p.is_essence, p.circle_top, p.view_count, p.like_count, p.comment_count, p.favorite_count, p.hot_score, p.created_at, p.updated_at"
+const postColsP = "p.id, p.user_id, p.circle_id, p.title, p.content, p.link_type, p.link_url, p.visibility, p.status, p.reject_reason, p.is_top, p.is_essence, p.is_red_title, p.is_sink, p.circle_top, p.view_count, p.like_count, p.comment_count, p.favorite_count, p.hot_score, p.created_at, p.updated_at"
 
 func NewPostModel(conn sqlx.SqlConn) *PostModel { return &PostModel{conn: conn} }
 
@@ -396,10 +398,10 @@ func (m *PostModel) BumpHotScore(ctx context.Context, postID, delta int64) {
 // 幂等:全部由计数列导出,重复执行结果一致。
 func (m *PostModel) RecalcHotScores(ctx context.Context) error {
 	if _, err := m.conn.ExecCtx(ctx, `
-		UPDATE post SET hot_score = FLOOR(
+		UPDATE post SET hot_score = (FLOOR(
 			(like_count*10 + comment_count*15 + favorite_count*12 + view_count) * 1000
 			/ POW(TIMESTAMPDIFF(HOUR, created_at, NOW()) + 2, 1.5)
-		) + is_essence*5000
+		) + is_essence*5000) * (1 - is_sink)
 		WHERE status = ? AND created_at > NOW() - INTERVAL 7 DAY`, PostStatusPublished); err != nil {
 		return fmt.Errorf("recalc hot posts: %w", err)
 	}

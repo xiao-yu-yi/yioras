@@ -33,10 +33,10 @@ const (
 	maxMentions     = 10
 	maxCocreators   = 3
 
-	// 付费解锁定价区间与平台抽成(后台可配属运营配置,当前取产品默认值)
-	minPaidPrice     = 1
-	maxPaidPrice     = 1000
-	unlockFeePercent = 10
+	// 付费解锁定价区间与平台抽成的兜底默认(运营值走 app_config paid.*,后台「运营参数」页可调)
+	defMinPaidPrice     = 1
+	defMaxPaidPrice     = 1000
+	defUnlockFeePercent = 10
 
 	// 互动 → 热度实时增量权重(真值由周期重算公式兜底,见 PostModel.RecalcHotScores)
 	hotLike     = 10
@@ -76,8 +76,10 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 	}
 	paidContent := strings.TrimSpace(req.PaidContent)
 	if req.PaidPrice != 0 {
-		if req.PaidPrice < minPaidPrice || req.PaidPrice > maxPaidPrice {
-			return nil, xerr.Param(fmt.Sprintf("付费定价需为 %d-%d 忧珠", minPaidPrice, maxPaidPrice))
+		minPrice := l.svcCtx.ConfigModel.Int(ctx, "paid.min_price", defMinPaidPrice)
+		maxPrice := l.svcCtx.ConfigModel.Int(ctx, "paid.max_price", defMaxPaidPrice)
+		if req.PaidPrice < minPrice || req.PaidPrice > maxPrice {
+			return nil, xerr.Param(fmt.Sprintf("付费定价需为 %d-%d 忧珠", minPrice, maxPrice))
 		}
 		if paidContent == "" {
 			return nil, xerr.Param("付费内容不能为空")
@@ -86,11 +88,22 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 			return nil, xerr.Param("付费内容超出长度限制")
 		}
 	}
-	if _, err := l.svcCtx.CircleModel.FindByID(ctx, req.CircleID); err != nil {
+	circle, err := l.svcCtx.CircleModel.FindByID(ctx, req.CircleID)
+	if err != nil {
 		if model.IsNotFound(err) {
 			return nil, xerr.New(xerr.CodeNotFound, "圈子不存在")
 		}
 		return nil, fmt.Errorf("circle find: %w", err)
+	}
+	// 官方圈(官方公告等)仅圈主/管理员可发帖(需求 3.4),普通用户只读
+	if circle.IsOfficial == 1 {
+		role, err := l.svcCtx.CircleModel.RoleOf(ctx, req.CircleID, uid)
+		if err != nil {
+			return nil, fmt.Errorf("circle role: %w", err)
+		}
+		if role < model.CircleRoleAdmin {
+			return nil, xerr.New(xerr.CodeForbidden, "官方圈子仅管理人员可以发帖")
+		}
 	}
 	if err := l.checkMuted(ctx, req.CircleID, uid); err != nil {
 		return nil, err
@@ -197,6 +210,7 @@ func (l *Logic) Share(ctx context.Context, uid, postID int64) (*types.SharePostR
 			logx.WithContext(ctx).Errorf("share count: %v", err)
 		}
 	}
+	l.taskProgress(ctx, uid, "share") // 分享任务埋点(需求 3.8,后台可建 action=share 的任务)
 	name := p.Title
 	if name == "" {
 		name = truncateShare(p.Content, 20)
@@ -676,7 +690,11 @@ func (l *Logic) Unlock(ctx context.Context, uid, postID int64) (*types.UnlockRes
 		}
 		return nil, fmt.Errorf("paid find: %w", err)
 	}
-	income, err := l.svcCtx.PaidModel.Unlock(ctx, uid, p.UserID, postID, paid.Price, unlockFeePercent)
+	feePercent := l.svcCtx.ConfigModel.Int(ctx, "paid.fee_percent", defUnlockFeePercent)
+	if feePercent < 0 || feePercent > 50 {
+		feePercent = defUnlockFeePercent
+	}
+	income, err := l.svcCtx.PaidModel.Unlock(ctx, uid, p.UserID, postID, paid.Price, feePercent)
 	if err != nil {
 		switch {
 		case errors.Is(err, model.ErrAlreadyUnlocked):
@@ -878,6 +896,7 @@ func (l *Logic) decorate(ctx context.Context, uid int64, rows []*model.Post) ([]
 			LinkURL:       p.LinkURL,
 			IsTop:         p.IsTop == 1,
 			IsEssence:     p.IsEssence == 1,
+			IsRedTitle:    p.IsRedTitle == 1,
 			ViewCount:     p.ViewCount,
 			LikeCount:     p.LikeCount,
 			CommentCount:  p.CommentCount,

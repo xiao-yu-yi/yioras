@@ -661,7 +661,7 @@ type ExchangeRecordItem struct {
 // ---- 举报 ----
 
 type CreateReportReq struct {
-	TargetType int      `json:"targetType,options=1|2|3|4"` // 1帖子 2评论 3用户 4私信
+	TargetType int      `json:"targetType,options=1|2|3|4|5"` // 1帖子 2评论 3用户 4私信 5软件
 	TargetID   int64    `json:"targetId"`
 	Category   int      `json:"category,options=1|2|3|4|5"` // 1违法 2色情 3诈骗 4侵权 5其他
 	Reason     string   `json:"reason,optional"`            // 补充说明 ≤500
@@ -956,9 +956,11 @@ type AdminCircleSaveReq struct {
 // ---- 帖子运营置顶/加精 ----
 
 type AdminPostOpsReq struct {
-	PostID    int64 `path:"id"`
-	IsTop     int64 `json:"isTop,optional,options=0|1|-1,default=-1"`     // 首页置顶精选,-1 不变
-	IsEssence int64 `json:"isEssence,optional,options=0|1|-1,default=-1"` // 加精,-1 不变
+	PostID     int64 `path:"id"`
+	IsTop      int64 `json:"isTop,optional,options=0|1|-1,default=-1"`      // 首页置顶精选,-1 不变
+	IsEssence  int64 `json:"isEssence,optional,options=0|1|-1,default=-1"`  // 加精,-1 不变
+	IsRedTitle int64 `json:"isRedTitle,optional,options=0|1|-1,default=-1"` // 红色标题(运营帖),-1 不变
+	IsSink     int64 `json:"isSink,optional,options=0|1|-1,default=-1"`     // 下沉(热度强制 0),-1 不变
 }
 
 // ---- 话题管理 ----
@@ -1184,9 +1186,11 @@ type AdminContentItem struct {
 	CircleID   int64  `json:"circleId,omitempty"` // 帖子专属
 	BizType    int64  `json:"bizType,omitempty"`  // 评论专属:1帖子 2软件
 	BizID      int64  `json:"bizId,omitempty"`    // 评论专属
-	IsTop      int64  `json:"isTop"`              // 帖子:首页置顶精选
-	IsEssence  int64  `json:"isEssence"`          // 帖子:加精
-	FirstImage string `json:"firstImage"`         // 帖子首图(评论恒空)
+	IsTop      int64  `json:"isTop"`      // 帖子:首页置顶精选
+	IsEssence  int64  `json:"isEssence"`  // 帖子:加精
+	IsRedTitle int64  `json:"isRedTitle"` // 帖子:红色标题
+	IsSink     int64  `json:"isSink"`     // 帖子:下沉
+	FirstImage string `json:"firstImage"` // 帖子首图(评论恒空)
 	LikeCount  int64  `json:"likeCount"`
 	ViewCount  int64  `json:"viewCount"` // 评论恒 0
 	CreatedAt  int64  `json:"createdAt"`
@@ -1407,6 +1411,7 @@ type PostItem struct {
 	LinkURL       string      `json:"linkUrl,omitempty"`
 	IsTop         bool        `json:"isTop"`
 	IsEssence     bool        `json:"isEssence"`
+	IsRedTitle    bool        `json:"isRedTitle"` // 运营帖红色标题(客户端标题高亮渲染)
 	ViewCount     int64       `json:"viewCount"`
 	LikeCount     int64       `json:"likeCount"`
 	CommentCount  int64       `json:"commentCount"`

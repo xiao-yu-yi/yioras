@@ -642,9 +642,9 @@ func (l *Logic) SaveCircle(ctx context.Context, adminID int64, req *types.AdminC
 	return id, nil
 }
 
-// PostOps 帖子运营位:首页置顶/加精。
+// PostOps 帖子运营位:首页置顶/加精/红色标题/下沉。
 func (l *Logic) PostOps(ctx context.Context, adminID int64, req *types.AdminPostOpsReq, ip string) error {
-	ok, err := l.svcCtx.AdminModel.SetPostOps(ctx, req.PostID, req.IsTop, req.IsEssence)
+	ok, err := l.svcCtx.AdminModel.SetPostOps(ctx, req.PostID, req.IsTop, req.IsEssence, req.IsRedTitle, req.IsSink)
 	if err != nil {
 		return err
 	}
@@ -652,7 +652,8 @@ func (l *Logic) PostOps(ctx context.Context, adminID int64, req *types.AdminPost
 		return xerr.New(xerr.CodeNotFound, "帖子不存在或未发布")
 	}
 	l.opLog(ctx, adminID, "content.postops",
-		fmt.Sprintf("post:%d top:%d essence:%d", req.PostID, req.IsTop, req.IsEssence), "", ip)
+		fmt.Sprintf("post:%d top:%d essence:%d red:%d sink:%d",
+			req.PostID, req.IsTop, req.IsEssence, req.IsRedTitle, req.IsSink), "", ip)
 	return nil
 }
 
@@ -903,8 +904,11 @@ func (l *Logic) SaveAppConfigs(ctx context.Context, adminID int64, req *types.Ap
 	}
 	for _, it := range req.Items {
 		v := strings.TrimSpace(it.V)
-		if n, err := strconv.ParseInt(v, 10, 64); err != nil || n < 0 {
-			return xerr.Param(fmt.Sprintf("参数 %s 必须是非负整数", it.K))
+		// 合法值:非负整数,或逗号分隔的非负整数列表(如签到阶梯)
+		for _, part := range strings.Split(v, ",") {
+			if n, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64); err != nil || n < 0 {
+				return xerr.Param(fmt.Sprintf("参数 %s 必须是非负整数(或逗号分隔的整数列表)", it.K))
+			}
 		}
 		ok, err := l.svcCtx.ConfigModel.Save(ctx, it.K, v)
 		if err != nil {
@@ -1143,8 +1147,9 @@ func (l *Logic) Contents(ctx context.Context, req *types.AdminContentListReq) (*
 			ID: r.ID, AuthorID: r.UserID, AuthorName: r.Nickname,
 			Title: r.Title, Content: truncateRunes(r.Content, 120), Status: r.Status,
 			CircleID: r.CircleID, BizType: r.BizType, BizID: r.BizID,
-			IsTop: r.IsTop, IsEssence: r.IsEssence, FirstImage: r.FirstImage,
-			LikeCount: r.LikeCount, ViewCount: r.ViewCount, CreatedAt: r.CreatedAt.UnixMilli(),
+			IsTop: r.IsTop, IsEssence: r.IsEssence, IsRedTitle: r.IsRedTitle, IsSink: r.IsSink,
+			FirstImage: r.FirstImage,
+			LikeCount:  r.LikeCount, ViewCount: r.ViewCount, CreatedAt: r.CreatedAt.UnixMilli(),
 		})
 	}
 	return out, nil

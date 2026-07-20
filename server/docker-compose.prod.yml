@@ -36,6 +36,7 @@ services:
       - ./sql/014_push_token.sql:/docker-entrypoint-initdb.d/014_push_token.sql:ro
       - ./sql/015_push_prefs.sql:/docker-entrypoint-initdb.d/015_push_prefs.sql:ro
       - ./sql/016_growth_config.sql:/docker-entrypoint-initdb.d/016_growth_config.sql:ro
+      - ./sql/017_ops_params.sql:/docker-entrypoint-initdb.d/017_ops_params.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s

@@ -583,6 +583,8 @@ type AdminContentRow struct {
 	BizID      int64     `db:"biz_id"`
 	IsTop      int64     `db:"is_top"`
 	IsEssence  int64     `db:"is_essence"`
+	IsRedTitle int64     `db:"is_red_title"`
+	IsSink     int64     `db:"is_sink"`
 	LikeCount  int64     `db:"like_count"`
 	ViewCount  int64     `db:"view_count"`
 	FirstImage string    `db:"first_image"`
@@ -609,7 +611,7 @@ func (m *AdminModel) SearchPostsAdmin(ctx context.Context, keyword string, statu
 	}
 	var rows []*AdminContentRow
 	q := `SELECT p.id, p.user_id, u.nickname, p.title, p.content, p.status, p.circle_id,
-		0 AS biz_type, 0 AS biz_id, p.is_top, p.is_essence, p.like_count, p.view_count,
+		0 AS biz_type, 0 AS biz_id, p.is_top, p.is_essence, p.is_red_title, p.is_sink, p.like_count, p.view_count,
 		COALESCE((SELECT url FROM post_image i WHERE i.post_id = p.id ORDER BY i.sort LIMIT 1), '') AS first_image,
 		p.created_at ` + from + " ORDER BY p.id DESC LIMIT ?, ?"
 	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
@@ -637,7 +639,7 @@ func (m *AdminModel) SearchCommentsAdmin(ctx context.Context, keyword string, st
 	}
 	var rows []*AdminContentRow
 	q := `SELECT c.id, c.user_id, u.nickname, '' AS title, c.content, c.status, 0 AS circle_id,
-		c.biz_type, c.biz_id, 0 AS is_top, 0 AS is_essence, c.like_count, 0 AS view_count,
+		c.biz_type, c.biz_id, 0 AS is_top, 0 AS is_essence, 0 AS is_red_title, 0 AS is_sink, c.like_count, 0 AS view_count,
 		'' AS first_image, c.created_at ` + from + " ORDER BY c.id DESC LIMIT ?, ?"
 	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
 		return 0, nil, fmt.Errorf("search comments admin: %w", err)
@@ -867,7 +869,7 @@ func (m *AdminModel) TargetBriefs(ctx context.Context, targetType int64, ids []i
 		tpl = "SELECT id, nickname AS text, status FROM `user` WHERE id IN (%s)"
 	case ReportTargetMessage:
 		tpl = "SELECT id, LEFT(content, 60) AS text, status FROM `message` WHERE id IN (%s)"
-	case 5: // 软件(M3)
+	case ReportTargetSoftware:
 		tpl = "SELECT id, name AS text, status FROM `software` WHERE id IN (%s)"
 	default:
 		return out, nil
@@ -1165,8 +1167,9 @@ func (m *AdminModel) SaveCircleAdmin(ctx context.Context, c *AdminCircleRow) (in
 	return id, true, err
 }
 
-// SetPostOps 帖子运营位:首页置顶(is_top)/加精(is_essence),-1 不变。仅已发布帖可操作。
-func (m *AdminModel) SetPostOps(ctx context.Context, postID, isTop, isEssence int64) (bool, error) {
+// SetPostOps 帖子运营位:首页置顶/加精/红标题/下沉,-1 不变。仅已发布帖可操作。
+// 下沉立即压 0 热度(重算公式里 is_sink 恒零分,不会再涨回)。
+func (m *AdminModel) SetPostOps(ctx context.Context, postID, isTop, isEssence, isRedTitle, isSink int64) (bool, error) {
 	sets, args := []string{}, []any{}
 	if isTop >= 0 {
 		sets = append(sets, "is_top = ?")
@@ -1175,6 +1178,17 @@ func (m *AdminModel) SetPostOps(ctx context.Context, postID, isTop, isEssence in
 	if isEssence >= 0 {
 		sets = append(sets, "is_essence = ?")
 		args = append(args, isEssence)
+	}
+	if isRedTitle >= 0 {
+		sets = append(sets, "is_red_title = ?")
+		args = append(args, isRedTitle)
+	}
+	if isSink >= 0 {
+		sets = append(sets, "is_sink = ?")
+		args = append(args, isSink)
+		if isSink == 1 {
+			sets = append(sets, "hot_score = 0")
+		}
 	}
 	if len(sets) == 0 {
 		return true, nil

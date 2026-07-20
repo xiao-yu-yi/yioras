@@ -15,7 +15,7 @@ import (
 	"github.com/yiora/server/internal/types"
 )
 
-// drawCost 单次抽奖消耗忧珠。后台可配属运营配置,M4 取产品默认值。
+// drawCost 单次抽奖消耗忧珠的兜底默认(运营值走 app_config lottery.cost)。
 const drawCost = 10
 
 type Logic struct {
@@ -166,7 +166,10 @@ func (l *Logic) Pools(ctx context.Context) (*types.LotteryPoolsResp, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list prizes: %w", err)
 	}
-	resp := &types.LotteryPoolsResp{Cost: drawCost, Prizes: make([]types.PrizeItem, 0, len(rows))}
+	resp := &types.LotteryPoolsResp{
+		Cost:   l.svcCtx.ConfigModel.Int(ctx, "lottery.cost", drawCost),
+		Prizes: make([]types.PrizeItem, 0, len(rows)),
+	}
 	for _, p := range rows {
 		resp.Prizes = append(resp.Prizes, types.PrizeItem{
 			ID: p.ID, Name: p.Name, Kind: p.Kind, Amount: p.Amount, Weight: p.Weight,
@@ -180,7 +183,7 @@ func (l *Logic) Draw(ctx context.Context, uid int64) (*types.DrawResp, error) {
 	if err := userlogic.EnsureNotTeen(ctx, l.svcCtx, uid); err != nil {
 		return nil, err
 	}
-	prize, err := l.svcCtx.MallModel.Draw(ctx, uid, drawCost)
+	prize, err := l.svcCtx.MallModel.Draw(ctx, uid, l.svcCtx.ConfigModel.Int(ctx, "lottery.cost", drawCost))
 	if err != nil {
 		switch {
 		case errors.Is(err, model.ErrInsufficientBalance):

@@ -75,6 +75,24 @@
           />
         </template>
       </el-table-column>
+      <el-table-column v-if="type === 1" label="红标题" width="80">
+        <template #default="{ row }">
+          <el-switch
+            :model-value="row.isRedTitle === 1"
+            :disabled="row.status !== 1"
+            @change="(v: boolean) => toggleOps(row, 'isRedTitle', v)"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column v-if="type === 1" label="下沉" width="80">
+        <template #default="{ row }">
+          <el-switch
+            :model-value="row.isSink === 1"
+            :disabled="row.status !== 1"
+            @change="(v: boolean) => toggleOps(row, 'isSink', v)"
+          />
+        </template>
+      </el-table-column>
       <el-table-column label="发布时间" width="160">
         <template #default="{ row }">{{ fmt(row.createdAt) }}</template>
       </el-table-column>
@@ -199,10 +217,16 @@ async function submitTakedown() {
   }
 }
 
-async function toggleOps(row: AdminContentItem, field: 'isTop' | 'isEssence', on: boolean) {
+async function toggleOps(row: AdminContentItem, field: 'isTop' | 'isEssence' | 'isRedTitle' | 'isSink', on: boolean) {
   await api.postOps(row.id, { [field]: on ? 1 : 0 })
   row[field] = on ? 1 : 0
-  ElMessage.success(field === 'isTop' ? (on ? '已置顶到首页精选' : '已取消置顶') : on ? '已加精' : '已取消加精')
+  const names: Record<string, [string, string]> = {
+    isTop: ['已置顶到首页精选', '已取消置顶'],
+    isEssence: ['已加精', '已取消加精'],
+    isRedTitle: ['已设为红色标题', '已取消红色标题'],
+    isSink: ['已下沉(热度清零且不再累计)', '已取消下沉(下轮重算恢复热度)'],
+  }
+  ElMessage.success(on ? names[field][0] : names[field][1])
 }
 
 async function restore(row: AdminContentItem) {

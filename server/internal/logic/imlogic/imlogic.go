@@ -21,10 +21,10 @@ import (
 
 const (
 	maxTextRunes = 2000
-	// 未互关每日可发条数上限(防骚扰)。后台可配属 M3 运营配置,当前取产品默认值。
+	// 未互关每日可发条数上限的兜底默认(运营值走 app_config im.stranger_daily)
 	nonMutualDailyLimit = 3
 
-	// 撤回窗口:发出后 2 分钟内
+	// 撤回窗口兜底默认(运营值走 app_config im.recall_sec)
 	recallWindowSec = 120
 
 	// WS 下行帧 op,客户端据此分发
@@ -117,7 +117,7 @@ func (l *Logic) Send(ctx context.Context, uid int64, req *types.SendMessageReq) 
 					return nil, fmt.Errorf("im rate limit expire: %w", err)
 				}
 			}
-			if n > nonMutualDailyLimit {
+			if n > l.svcCtx.ConfigModel.Int(ctx, "im.stranger_daily", nonMutualDailyLimit) {
 				return nil, xerr.New(xerr.CodeTooFrequent, "对方还未回关,今日私信条数已达上限")
 			}
 		}
@@ -392,10 +392,11 @@ func (l *Logic) Recall(ctx context.Context, uid int64, req *types.RecallMessageR
 	if err != nil {
 		return err
 	}
-	msg, err := l.svcCtx.IMModel.RecallMessage(ctx, req.ConvID, req.MsgID, uid, recallWindowSec)
+	window := int(l.svcCtx.ConfigModel.Int(ctx, "im.recall_sec", recallWindowSec))
+	msg, err := l.svcCtx.IMModel.RecallMessage(ctx, req.ConvID, req.MsgID, uid, window)
 	if err != nil {
 		if model.IsRecallExpired(err) {
-			return xerr.New(xerr.CodeForbidden, "超过 2 分钟,消息不可撤回")
+			return xerr.New(xerr.CodeForbidden, fmt.Sprintf("超过 %d 分钟,消息不可撤回", window/60))
 		}
 		if model.IsNotFound(err) {
 			return xerr.New(xerr.CodeNotFound, "消息不存在或不可撤回")

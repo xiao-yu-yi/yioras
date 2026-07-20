@@ -112,6 +112,8 @@ export interface AdminContentItem {
   bizId?: number
   isTop: number
   isEssence: number
+  isRedTitle: number
+  isSink: number
   firstImage: string
   likeCount: number
   viewCount: number
@@ -290,7 +292,7 @@ export const api = {
   appointCircle: (circleId: number, userId: number, role: number) =>
     http.post(`/circles/${circleId}/appoint`, { userId, role }),
   // 帖子运营位
-  postOps: (postId: number, patch: { isTop?: number; isEssence?: number }) =>
+  postOps: (postId: number, patch: { isTop?: number; isEssence?: number; isRedTitle?: number; isSink?: number }) =>
     http.post(`/posts/${postId}/ops`, patch),
   // 话题管理
   topics: (params: { keyword?: string; status: number; page: number; size: number }) =>

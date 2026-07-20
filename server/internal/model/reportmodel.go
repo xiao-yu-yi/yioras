@@ -10,10 +10,11 @@ import (
 
 // 举报对象类型(report.target_type)
 const (
-	ReportTargetPost    = 1
-	ReportTargetComment = 2
-	ReportTargetUser    = 3
-	ReportTargetMessage = 4
+	ReportTargetPost     = 1
+	ReportTargetComment  = 2
+	ReportTargetUser     = 3
+	ReportTargetMessage  = 4
+	ReportTargetSoftware = 5
 )
 
 // ReportModel 举报。

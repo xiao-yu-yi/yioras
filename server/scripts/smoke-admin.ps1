@@ -445,6 +445,25 @@ Write-Output "[12.45] cfgRows=$($expCfg.Count) (expect 5); expGain=$expGain (exp
 $hot1 = (docker compose exec -T mysql sh -c "mysql -uroot -proot123 yiora -N -e 'SELECT hot_score FROM post WHERE id=$($gp.data.postId)' 2>/dev/null" | Out-String).Trim()
 Write-Output "[12.46] hotScoreAfterLike=$hot1 (expect >0, like bumps +10)"
 
+# 12.47 ops params: config-driven lottery cost takes effect immediately; ladder readable; invalid list rejected
+$allCfg = (Invoke-RestMethod "$adm/configs" -Headers $ha).data
+PostJson "$adm/configs" @{items = @(@{k = "lottery.cost"; v = "20"})} $ha | Out-Null
+$poolCost = (Invoke-RestMethod "$api/lottery/pools").data.cost
+PostJson "$adm/configs" @{items = @(@{k = "lottery.cost"; v = "10"})} $ha | Out-Null
+$ladderBad = PostJson "$adm/configs" @{items = @(@{k = "sign.ladder"; v = "5,x,10"})} $ha
+Write-Output "[12.47] cfgTotal=$($allCfg.Count) (expect 12); lotteryCost=$poolCost (expect 20, live change); badLadder=code$($ladderBad.code) (expect 40000)"
+
+# 12.48 red-title/sink ops + official-circle post guard + software report
+$rt = PostJson "$adm/posts/$($target.data.postId)/ops" @{isRedTitle = 1; isSink = 1} $ha
+$rtDetail = (Invoke-RestMethod "$api/posts/$($target.data.postId)").data
+$sinkScore = (docker compose exec -T mysql sh -c "mysql -uroot -proot123 yiora -N -e 'SELECT hot_score FROM post WHERE id=$($target.data.postId)' 2>/dev/null" | Out-String).Trim()
+PostJson "$adm/posts/$($target.data.postId)/ops" @{isRedTitle = 0; isSink = 0} $ha | Out-Null
+$oc = PostJson "$adm/circles" @{name = "OfficialZone"; icon = $cicon; intro = "official only"; isOfficial = 1} $ha
+$ocPost = PostJson "$api/posts" @{circleId = $oc.data.id; content = "should be denied"} $h1
+$swRep = PostJson "$api/reports" @{targetType = 5; targetId = $swId; category = 4; reason = "fake software"} $h1
+$swRepListed = @(((Invoke-RestMethod "$adm/reports?targetType=5" -Headers $ha).data.list) | Where-Object { $_.targetId -eq $swId }).Count
+Write-Output "[12.48] redTitle=$($rtDetail.isRedTitle) (expect True) sinkScore=$sinkScore (expect 0); officialPost=code$($ocPost.code) (expect 40300); swReport=code$($swRep.code) listed=$swRepListed (expect 1)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

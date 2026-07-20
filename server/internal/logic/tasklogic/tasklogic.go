@@ -4,6 +4,8 @@ package tasklogic
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/yiora/server/internal/logic/growth"
@@ -15,14 +17,38 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-// signLadder 连签 7 天一循环的阶梯奖励(第 8 天回到档位 1)。后台可配属运营配置,M3 取产品默认值。
-var signLadder = [7]int64{5, 5, 10, 10, 15, 15, 30}
+// signLadderDefault 连签阶梯默认档(参数表 sign.ladder 被清空时兜底)。
+var signLadderDefault = []int64{5, 5, 10, 10, 15, 15, 30}
 
-func ladderReward(continuous int64) int64 {
+// parseLadder 解析逗号分隔阶梯配置;非法返回 nil(调用方回退默认)。
+func parseLadder(raw string) []int64 {
+	if raw == "" {
+		return nil
+	}
+	parsed := make([]int64, 0, 8)
+	for _, part := range strings.Split(raw, ",") {
+		n, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
+		if err != nil || n < 0 {
+			return nil
+		}
+		parsed = append(parsed, n)
+	}
+	return parsed
+}
+
+func ladderRewardOf(ladder []int64, continuous int64) int64 {
+	if len(ladder) == 0 {
+		ladder = signLadderDefault
+	}
 	if continuous < 1 {
 		continuous = 1
 	}
-	return signLadder[(continuous-1)%7]
+	return ladder[(continuous-1)%int64(len(ladder))]
+}
+
+// ladderReward 连签阶梯奖励,档位循环;阶梯后台可配(app_config sign.ladder,逗号分隔)。
+func (l *Logic) ladderReward(ctx context.Context, continuous int64) int64 {
+	return ladderRewardOf(parseLadder(l.svcCtx.ConfigModel.Str(ctx, "sign.ladder", "")), continuous)
 }
 
 const dayLayout = "2006-01-02"
@@ -61,7 +87,7 @@ func (l *Logic) List(ctx context.Context, uid int64) (*types.TasksResp, error) {
 		return nil, err
 	}
 	resp.SignedToday, resp.Continuous = signed, cont
-	resp.NextReward = ladderReward(cont + 1)
+	resp.NextReward = l.ladderReward(ctx, cont+1)
 	return resp, nil
 }
 
@@ -77,7 +103,7 @@ func (l *Logic) SignIn(ctx context.Context, uid int64) (*types.SignInResp, error
 	} else if !model.IsNotFound(err) {
 		return nil, fmt.Errorf("find yesterday sign: %w", err)
 	}
-	reward := ladderReward(continuous)
+	reward := l.ladderReward(ctx, continuous)
 
 	ok, err := l.svcCtx.TaskModel.SignIn(ctx, uid, today, continuous, reward)
 	if err != nil {

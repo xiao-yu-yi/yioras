@@ -114,6 +114,12 @@ export default [
         name: "Youzhu",
         component: () => import("@/views/yiora/YouzhuView.vue"),
         meta: { title: "忧珠运营", icon: "ep/coin" }
+      },
+      {
+        path: "/configs",
+        name: "Configs",
+        component: () => import("@/views/yiora/ConfigsView.vue"),
+        meta: { title: "运营参数", icon: "ep/operation" }
       }
     ]
   },

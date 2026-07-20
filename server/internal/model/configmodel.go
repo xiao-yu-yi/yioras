@@ -73,6 +73,18 @@ func (m *ConfigModel) Int(ctx context.Context, key string, def int64) int64 {
 	return n
 }
 
+// Str 读字符串参数;缺失返回 def。
+func (m *ConfigModel) Str(ctx context.Context, key, def string) string {
+	all, err := m.loadAll(ctx)
+	if err != nil {
+		return def
+	}
+	if raw, ok := all[key]; ok && raw != "" {
+		return raw
+	}
+	return def
+}
+
 // Invalidate 后台保存后立即失效缓存(本实例即时生效;多实例等 TTL)。
 func (m *ConfigModel) Invalidate() {
 	m.mu.Lock()

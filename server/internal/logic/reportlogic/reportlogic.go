@@ -85,6 +85,13 @@ func (l *Logic) checkTarget(ctx context.Context, uid int64, targetType int, targ
 			}
 			return fmt.Errorf("report user find: %w", err)
 		}
+	case model.ReportTargetSoftware:
+		if _, err := l.svcCtx.SoftwareModel.FindByID(ctx, targetID); err != nil {
+			if model.IsNotFound(err) {
+				return xerr.New(xerr.CodeNotFound, "软件不存在")
+			}
+			return fmt.Errorf("report software find: %w", err)
+		}
 	case model.ReportTargetMessage:
 		msg, err := l.svcCtx.IMModel.FindMessage(ctx, targetID)
 		if err != nil {
