@@ -12,6 +12,10 @@ import '../../features/circle/view/circle_discover_page.dart';
 import '../../features/feed/view/feed_page.dart';
 import '../../features/growth/view/task_center_page.dart';
 import '../../features/growth/view/youzhu_page.dart';
+import '../../features/mall/view/decoration_mall_page.dart';
+import '../../features/mall/view/exchange_records_page.dart';
+import '../../features/mall/view/lottery_page.dart';
+import '../../features/mall/view/pretty_no_page.dart';
 import '../../features/messages/model/message_models.dart';
 import '../../features/messages/view/messages_page.dart';
 import '../../features/messages/view/notifications_page.dart';
@@ -143,6 +147,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.myPublications,
         builder: (context, state) => const MyPublicationsPage(),
+      ),
+      GoRoute(
+        path: Routes.decorationMall,
+        builder: (context, state) => const DecorationMallPage(),
+      ),
+      GoRoute(
+        path: Routes.prettyNoMall,
+        builder: (context, state) => const PrettyNoPage(),
+      ),
+      GoRoute(
+        path: Routes.lottery,
+        builder: (context, state) => const LotteryPage(),
+      ),
+      GoRoute(
+        path: Routes.exchangeRecords,
+        builder: (context, state) => const ExchangeRecordsPage(),
       ),
       // 底部 Tab 主壳：IndexedStack 保活各分支浏览位置
       StatefulShellRoute.indexedStack(

@@ -79,6 +79,17 @@ class PostDetailApi {
     ).unwrap();
   }
 
+  /// POST /posts/{id}/unlock 忧珠解锁付费段，返回付费全文与余额
+  Future<UnlockResult> unlockPost(int postId) async {
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/posts/$postId/unlock',
+    );
+    return ApiResponse.fromJson(
+      resp.data!,
+      (data) => UnlockResult.fromJson(data as Map<String, dynamic>),
+    ).unwrap();
+  }
+
   /// 发评论；replyTo 为被回复的评论 ID（0/null 表示直接回帖），返回新评论
   Future<Comment> createComment(
     int postId, {

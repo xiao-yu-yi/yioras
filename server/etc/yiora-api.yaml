@@ -49,3 +49,6 @@ Search:
 LLM:
   BaseURL: "" # 空=管家纯 FAQ 规则;接大模型填 OpenAI 兼容端点(如 https://api.deepseek.com)+ APIKey
   Model: deepseek-v4-flash
+
+Push:
+  Mock: false # 离线推送:本机默认关;APNs 段配齐(KeyID/TeamID/BundleID/PrivateKey)自动启用 apns 渠道

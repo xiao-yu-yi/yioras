@@ -33,6 +33,7 @@ services:
       - ./sql/011_admin_totp.sql:/docker-entrypoint-initdb.d/011_admin_totp.sql:ro
       - ./sql/012_agreement.sql:/docker-entrypoint-initdb.d/012_agreement.sql:ro
       - ./sql/013_teen_share.sql:/docker-entrypoint-initdb.d/013_teen_share.sql:ro
+      - ./sql/014_push_token.sql:/docker-entrypoint-initdb.d/014_push_token.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s
@@ -85,6 +86,11 @@ services:
       YIORA_LLM_BASE_URL: ${YIORA_LLM_BASE_URL:-}
       YIORA_LLM_API_KEY: ${YIORA_LLM_API_KEY:-}
       YIORA_LLM_MODEL: ${YIORA_LLM_MODEL:-deepseek-v4-flash}
+      # APNs 离线推送:留空=iOS 渠道不启用
+      YIORA_APNS_KEY_ID: ${YIORA_APNS_KEY_ID:-}
+      YIORA_APNS_TEAM_ID: ${YIORA_APNS_TEAM_ID:-}
+      YIORA_APNS_BUNDLE_ID: ${YIORA_APNS_BUNDLE_ID:-}
+      YIORA_APNS_P8: ${YIORA_APNS_P8:-}
     depends_on:
       mysql:
         condition: service_healthy

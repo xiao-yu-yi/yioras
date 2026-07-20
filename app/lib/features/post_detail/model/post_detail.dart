@@ -19,6 +19,25 @@ class PostDetail {
     liked: json['liked'] as bool? ?? false,
     favorited: json['favorited'] as bool? ?? false,
   );
+
+  PostDetail copyWith({Post? post, bool? favorited}) => PostDetail(
+    post: post ?? this.post,
+    liked: liked,
+    favorited: favorited ?? this.favorited,
+  );
+}
+
+/// 付费解锁结果（对齐 server UnlockResp）
+class UnlockResult {
+  const UnlockResult({required this.paidContent, required this.balance});
+
+  final String paidContent;
+  final int balance;
+
+  factory UnlockResult.fromJson(Map<String, dynamic> json) => UnlockResult(
+    paidContent: json['paidContent'] as String? ?? '',
+    balance: (json['balance'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// 评论（两级，对齐 comment 表）：一级评论可挂回复列表。

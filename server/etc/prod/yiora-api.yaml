@@ -55,3 +55,11 @@ LLM:
   APIKey: ${YIORA_LLM_API_KEY}
   Model: ${YIORA_LLM_MODEL}
   TimeoutSec: 5
+
+Push:
+  APNs: # 四项配齐启用 iOS 离线推送;厂商通道随账号开通补
+    KeyID: ${YIORA_APNS_KEY_ID}
+    TeamID: ${YIORA_APNS_TEAM_ID}
+    BundleID: ${YIORA_APNS_BUNDLE_ID}
+    PrivateKey: ${YIORA_APNS_P8}
+    Production: true

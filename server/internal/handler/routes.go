@@ -56,6 +56,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodDelete, Path: "/user/devices/:id", Handler: kickDeviceHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/user/settings", Handler: userSettingsHandler(svcCtx)},
 		{Method: http.MethodPut, Path: "/user/settings", Handler: updateSettingsHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/user/push-token", Handler: pushTokenHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/user/deactivate", Handler: deactivateHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/user/history", Handler: userHistoryHandler(svcCtx)},
 		{Method: http.MethodDelete, Path: "/user/history", Handler: clearHistoryHandler(svcCtx)},

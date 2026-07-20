@@ -67,4 +67,16 @@ type Config struct {
 		Model      string `json:",optional"` // 如 deepseek-v4-flash
 		TimeoutSec int    `json:",default=5"`
 	} `json:",optional"`
+
+	Push struct {
+		Mock bool `json:",optional"` // dev/冒烟:mock 渠道写 Redis 供断言
+		APNs struct {
+			KeyID      string `json:",optional"`
+			TeamID     string `json:",optional"`
+			BundleID   string `json:",optional"`
+			PrivateKey string `json:",optional"` // .p8 PEM 全文(环境变量注入)
+			Production bool   `json:",optional"`
+		} `json:",optional"`
+		// huawei/xiaomi/oppo/vivo 渠道配置随厂商账号开通补充
+	} `json:",optional"`
 }

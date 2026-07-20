@@ -28,11 +28,14 @@ class PublishPostPage extends ConsumerStatefulWidget {
 class _PublishPostPageState extends ConsumerState<PublishPostPage> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
+  final _paidContentController = TextEditingController();
+  final _paidPriceController = TextEditingController();
   final _picker = ImagePicker();
 
   final List<String> _imagePaths = [];
   Circle? _circle;
   List<String> _topics = [];
+  bool _paidEnabled = false;
   bool _submitting = false;
 
   @override
@@ -46,6 +49,11 @@ class _PublishPostPageState extends ConsumerState<PublishPostPage> {
       _imagePaths.addAll(draft.imagePaths);
       _circle = draft.circle;
       _topics = [...draft.topics];
+      _paidEnabled = draft.isPaid;
+      if (draft.isPaid) {
+        _paidPriceController.text = '${draft.paidPrice}';
+        _paidContentController.text = draft.paidContent;
+      }
     }
   }
 
@@ -53,8 +61,13 @@ class _PublishPostPageState extends ConsumerState<PublishPostPage> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _paidContentController.dispose();
+    _paidPriceController.dispose();
     super.dispose();
   }
+
+  int get _paidPrice =>
+      _paidEnabled ? (int.tryParse(_paidPriceController.text.trim()) ?? 0) : 0;
 
   PostDraft _currentDraft() => PostDraft(
     title: _titleController.text.trim(),
@@ -62,12 +75,20 @@ class _PublishPostPageState extends ConsumerState<PublishPostPage> {
     imagePaths: [..._imagePaths],
     circle: _circle,
     topics: [..._topics],
+    paidPrice: _paidPrice,
+    paidContent: _paidEnabled ? _paidContentController.text.trim() : '',
   );
 
   bool get _canSubmit {
     final draft = _currentDraft();
+    final paidOk =
+        !_paidEnabled ||
+        (draft.paidPrice > 0 &&
+            draft.paidPrice <= PostDraft.maxPaidPrice &&
+            draft.paidContent.isNotEmpty);
     return !_submitting &&
         _circle != null &&
+        paidOk &&
         (draft.content.isNotEmpty || draft.imagePaths.isNotEmpty);
   }
 
@@ -96,9 +117,12 @@ class _PublishPostPageState extends ConsumerState<PublishPostPage> {
     setState(() {
       _titleController.clear();
       _contentController.clear();
+      _paidContentController.clear();
+      _paidPriceController.clear();
       _imagePaths.clear();
       _circle = null;
       _topics = [];
+      _paidEnabled = false;
     });
     ref.read(publishDraftProvider.notifier).clear();
   }
@@ -370,7 +394,7 @@ class _PublishPostPageState extends ConsumerState<PublishPostPage> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        // 权限设置（M4 付费解锁占位，贴设计图）
+                        // 权限设置：忧珠付费解锁（文档 3.3/3.9）
                         Padding(
                           padding: const EdgeInsets.only(left: 6, bottom: 8),
                           child: Text(
@@ -388,52 +412,68 @@ class _PublishPostPageState extends ConsumerState<PublishPostPage> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Row(
+                          child: Column(
                             children: [
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFFFFB020,
-                                  ).withValues(alpha: .12),
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                                child: const Icon(
-                                  Icons.workspace_premium_outlined,
-                                  size: 17,
-                                  color: Color(0xFFB07800),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '付费查看',
-                                      style: TextStyle(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFFFFB020,
+                                      ).withValues(alpha: .12),
+                                      borderRadius: BorderRadius.circular(9),
                                     ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      '读者付费后才可查看全文',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.outline,
-                                      ),
+                                    child: const Icon(
+                                      Icons.workspace_premium_outlined,
+                                      size: 17,
+                                      color: Color(0xFFB07800),
                                     ),
-                                  ],
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          '付费查看',
+                                          style: TextStyle(
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 1),
+                                        Text(
+                                          '读者消耗忧珠解锁付费段，正文作为免费摘要',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.outline,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _paidEnabled,
+                                    onChanged: _submitting
+                                        ? null
+                                        : (value) => setState(
+                                            () => _paidEnabled = value,
+                                          ),
+                                  ),
+                                ],
+                              ),
+                              if (_paidEnabled)
+                                _PaidSection(
+                                  priceController: _paidPriceController,
+                                  contentController: _paidContentController,
+                                  enabled: !_submitting,
+                                  onChanged: () => setState(() {}),
                                 ),
-                              ),
-                              Switch(
-                                value: false,
-                                onChanged: (_) => _comingSoon('付费查看'),
-                              ),
                             ],
                           ),
                         ),
@@ -527,6 +567,98 @@ class GradientSubmitButton extends StatelessWidget {
               )
             : Text(label),
       ),
+    );
+  }
+}
+
+/// 付费段编辑区：忧珠价格 + 付费全文输入（开启付费查看后展开）
+class _PaidSection extends StatelessWidget {
+  const _PaidSection({
+    required this.priceController,
+    required this.contentController,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final TextEditingController priceController;
+  final TextEditingController contentController;
+  final bool enabled;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        Divider(
+          height: 18,
+          thickness: .6,
+          color: scheme.outlineVariant.withValues(alpha: .4),
+        ),
+        Row(
+          children: [
+            const Text(
+              '解锁价格',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: priceController,
+                enabled: enabled,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.right,
+                maxLength: 3,
+                decoration: InputDecoration(
+                  hintText: '1-${PostDraft.maxPaidPrice}',
+                  hintStyle: TextStyle(fontSize: 13, color: scheme.outline),
+                  filled: false,
+                  counterText: '',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+                onChanged: (_) => onChanged(),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '忧珠',
+              style: TextStyle(fontSize: 12.5, color: scheme.outline),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: contentController,
+          enabled: enabled,
+          minLines: 3,
+          maxLines: 8,
+          maxLength: 2000,
+          decoration: InputDecoration(
+            hintText: '付费全文段（读者解锁后可见，必填）',
+            hintStyle: TextStyle(fontSize: 13, color: scheme.outline),
+            filled: true,
+            fillColor: const Color(0xFFF6F7F9),
+            counterText: '',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.all(12),
+          ),
+          style: const TextStyle(fontSize: 13.5, height: 1.55),
+          onChanged: (_) => onChanged(),
+        ),
+        const SizedBox(height: 4),
+      ],
     );
   }
 }

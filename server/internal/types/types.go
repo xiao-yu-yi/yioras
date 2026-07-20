@@ -98,6 +98,15 @@ type MultipartPartsResp struct {
 	URLs  []MultipartPartURL  `json:"urls"` // 未完成分片的新签 URL(续传直接用)
 }
 
+// ---- 离线推送 token 上报 ----
+
+type PushTokenReq struct {
+	DeviceID string `json:"deviceId"` // 登录响应下发的设备指纹
+	Platform string `json:"platform,options=ios|android|harmony"`
+	Channel  string `json:"channel,options=apns|huawei|xiaomi|oppo|vivo|mock"`
+	Token    string `json:"token"`
+}
+
 // ---- 管家应答统计 ----
 
 type BotStatsReq struct {

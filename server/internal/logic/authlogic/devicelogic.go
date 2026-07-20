@@ -112,6 +112,8 @@ func (l *Logic) removeDevice(ctx context.Context, uid int64, did, rtHash string)
 	}
 	// 存量 access token 拦到自然过期即可
 	_ = l.svcCtx.Redis.SetexCtx(ctx, kickKey(uid, did), "1", int(l.svcCtx.Config.Auth.AccessExpire))
+	// 同步清离线推送 token,被踢/淘汰设备不再收提醒
+	_ = l.svcCtx.PushModel.DeleteToken(ctx, uid, did)
 }
 
 // Refresh 刷新令牌轮换:旧 refresh token 一次性作废,发新 access + refresh 对。

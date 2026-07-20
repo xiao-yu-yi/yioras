@@ -26,6 +26,10 @@ abstract final class Routes {
   static const taskCenter = '/tasks';
   static const youzhu = '/youzhu';
   static const myPublications = '/my-publications';
+  static const decorationMall = '/mall/decorations';
+  static const prettyNoMall = '/mall/pretty-no';
+  static const lottery = '/mall/lottery';
+  static const exchangeRecords = '/mall/records';
 
   static String circleDetailPath(int id) => '/circles/$id';
 

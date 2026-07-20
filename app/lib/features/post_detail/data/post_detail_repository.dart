@@ -5,6 +5,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../feed/data/feed_repository.dart';
 import '../../feed/model/post.dart';
+import '../../growth/data/mock_wallet.dart';
 import '../model/post_detail.dart';
 import 'post_detail_api.dart';
 
@@ -27,6 +28,9 @@ abstract interface class PostDetailRepository {
     required String content,
     int? replyTo,
   });
+
+  /// 忧珠解锁付费段（文档 3.9 付费帖解锁）
+  Future<UnlockResult> unlockPost(int postId);
 }
 
 class PostDetailRepositoryHttp implements PostDetailRepository {
@@ -73,6 +77,10 @@ class PostDetailRepositoryHttp implements PostDetailRepository {
     () => _api.createComment(postId, content: content, replyTo: replyTo),
   );
 
+  @override
+  Future<UnlockResult> unlockPost(int postId) =>
+      _guard(() => _api.unlockPost(postId));
+
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();
@@ -115,9 +123,13 @@ class PostDetailRepositoryMock implements PostDetailRepository {
   Future<PostDetail> fetchDetail(int postId) async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
     final page = await _feedRepository.fetchRecommend(size: 100);
-    final post = page.list.where((p) => p.id == postId).firstOrNull;
+    var post = page.list.where((p) => p.id == postId).firstOrNull;
     if (post == null) {
       throw const ApiException(code: 40400, message: '帖子不存在或已删除');
+    }
+    // 会话内已解锁的付费帖：详情下发付费全文
+    if (post.isPaid && _unlocked.contains(postId)) {
+      post = post.copyWith(unlocked: true, paidContent: _mockPaidContent);
     }
     return PostDetail(
       post: post,
@@ -244,6 +256,42 @@ class PostDetailRepositoryMock implements PostDetailRepository {
       createdAt: DateTime.now(),
     );
   }
+
+  /// 会话内已解锁的付费帖
+  static final Set<int> _unlocked = {};
+
+  @override
+  Future<UnlockResult> unlockPost(int postId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 550));
+    final detail = await fetchDetail(postId);
+    final post = detail.post;
+    if (!post.isPaid) {
+      throw const ApiException(code: 40001, message: '该帖无需解锁');
+    }
+    if (!_unlocked.add(postId)) {
+      throw const ApiException(code: 42900, message: '已解锁过该帖');
+    }
+    if (MockYouzhuWallet.balance < post.paidPrice) {
+      _unlocked.remove(postId);
+      throw const ApiException(code: 40300, message: '忧珠余额不足，去任务中心赚一点吧');
+    }
+    MockYouzhuWallet.apply(
+      bizType: 6,
+      amount: -post.paidPrice,
+      remark: '解锁付费帖「${post.title.isNotEmpty ? post.title : '无标题'}」',
+    );
+    return UnlockResult(
+      paidContent: _mockPaidContent,
+      balance: MockYouzhuWallet.balance,
+    );
+  }
+
+  static const _mockPaidContent =
+      '【付费段全文】这里是解锁后可见的完整干货：\n'
+      '1. 完整折扣预测表（含历史低价对照与建议入手价位）；\n'
+      '2. 三个只在小圈子流传的比价站与提醒机器人配置方法；\n'
+      '3. 双币种支付的手续费规避技巧，实测每单省 4-7 元。\n'
+      '感谢支持，有问题评论区交流～';
 }
 
 final postDetailRepositoryProvider = Provider<PostDetailRepository>((ref) {

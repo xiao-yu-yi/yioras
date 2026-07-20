@@ -52,3 +52,6 @@ Search:
 LLM:
   BaseURL: "" # empty = bot answers by FAQ rules only; phase-2: https://api.deepseek.com + key + model deepseek-v4-flash
   Model: deepseek-v4-flash
+
+Push:
+  Mock: true # dev/smoke: offline push lands in redis mockpush:* keys; prod registers APNs/vendor channels instead

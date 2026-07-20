@@ -27,13 +27,16 @@ class PublishApi {
     ).unwrap();
   }
 
-  /// POST /posts 发动态（发布后进入审核流，状态=待审核）
+  /// POST /posts 发动态（发布后进入审核流，状态=待审核）；
+  /// paidPrice>0 开启忧珠付费解锁，content 为免费摘要段。
   Future<void> createPost({
     required String title,
     required String content,
     required int circleId,
     required List<String> topics,
     required List<String> imageUrls,
+    int paidPrice = 0,
+    String paidContent = '',
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
       '${AppConfig.apiPrefix}/posts',
@@ -43,6 +46,8 @@ class PublishApi {
         'circleId': circleId,
         'topics': topics,
         'images': imageUrls,
+        if (paidPrice > 0) 'paidPrice': paidPrice,
+        if (paidPrice > 0) 'paidContent': paidContent,
       },
     );
     ApiResponse.fromJson(resp.data!, (_) => null).unwrap();

@@ -121,8 +121,10 @@ class ProfileDrawer extends ConsumerWidget {
                     iconColor: const Color(0xFFF43F5E),
                     iconBg: const Color(0xFFFEECEF),
                     label: '兑换记录',
-                    milestone: 'M4',
-                    onTap: () => comingSoon('兑换记录', 'M4'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push(Routes.exchangeRecords);
+                    },
                   ),
                   const _SectionLabel('成长与装扮'),
                   _DrawerItem(
@@ -137,8 +139,10 @@ class ProfileDrawer extends ConsumerWidget {
                     iconColor: const Color(0xFFEC4899),
                     iconBg: const Color(0xFFFDEDF5),
                     label: '头像框装扮',
-                    milestone: 'M4',
-                    onTap: () => comingSoon('头像框装扮', 'M4'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push(Routes.decorationMall);
+                    },
                   ),
                   _DrawerItem(
                     icon: Icons.task_alt_rounded,
@@ -155,8 +159,20 @@ class ProfileDrawer extends ConsumerWidget {
                     iconColor: const Color(0xFF06B6D4),
                     iconBg: const Color(0xFFE5F7FB),
                     label: '靓号商城',
-                    milestone: 'M4',
-                    onTap: () => comingSoon('靓号商城', 'M4'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push(Routes.prettyNoMall);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.casino_outlined,
+                    iconColor: const Color(0xFF7C3AED),
+                    iconBg: const Color(0xFFF1ECFD),
+                    label: '积分抽奖',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push(Routes.lottery);
+                    },
                   ),
                   const _SectionLabel('更多'),
                   _DrawerItem(

@@ -3,6 +3,7 @@ package svc
 import (
 	"github.com/yiora/server/internal/config"
 	"github.com/yiora/server/internal/model"
+	"github.com/yiora/server/internal/pkg/apppush"
 	"github.com/yiora/server/internal/pkg/emailx"
 	"github.com/yiora/server/internal/pkg/imgscan"
 	"github.com/yiora/server/internal/pkg/ipallow"
@@ -29,8 +30,10 @@ type ServiceContext struct {
 	ImgScanner imgscan.Scanner // 图片机审驱动,nil=关闭(直传后异步送审)
 	Multipart *multipart.Client // S3 分片上传(APK 大文件),nil=对象存储未配置
 	LLM *llm.Client // AI 管家大模型,nil=纯 FAQ 规则模式
+	AppPush *apppush.Manager // 离线推送(APNs/厂商通道),无驱动时所有发送跳过
 
 	UserModel      *model.UserModel
+	PushModel      *model.PushModel
 	CircleModel    *model.CircleModel
 	PostModel      *model.PostModel
 	InteractModel  *model.InteractModel
@@ -85,9 +88,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		}
 		searcher = meiliClient
 	}
+	rds := redis.MustNewRedis(c.Redis)
+	pushMgr := apppush.NewManager()
+	if c.Push.Mock {
+		pushMgr.Register("mock", apppush.NewMock(rds))
+	}
+	apns, err := apppush.NewAPNs(apppush.APNsConfig{
+		KeyID: c.Push.APNs.KeyID, TeamID: c.Push.APNs.TeamID, BundleID: c.Push.APNs.BundleID,
+		PrivateKey: c.Push.APNs.PrivateKey, Production: c.Push.APNs.Production,
+	})
+	if err != nil {
+		logx.Must(err) // 配了 APNs 却密钥非法,宁可起不来
+	}
+	pushMgr.Register("apns", apns)
 	return &ServiceContext{
 		Config: c,
-		Redis:  redis.MustNewRedis(c.Redis),
+		Redis:  rds,
+		AppPush: pushMgr,
 		AdminIPs: adminIPs,
 		ImgScanner: scanner,
 		Multipart: mpClient,
@@ -106,6 +123,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Search: searcher,
 
 		UserModel:      model.NewUserModel(conn),
+		PushModel:      model.NewPushModel(conn),
 		CircleModel:    model.NewCircleModel(conn),
 		PostModel:      model.NewPostModel(conn),
 		InteractModel:  model.NewInteractModel(conn),

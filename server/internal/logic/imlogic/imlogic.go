@@ -10,6 +10,7 @@ import (
 
 	"github.com/yiora/server/internal/logic/postlogic"
 	"github.com/yiora/server/internal/model"
+	"github.com/yiora/server/internal/pkg/apppush"
 	"github.com/yiora/server/internal/pkg/llm"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -132,14 +133,46 @@ func (l *Logic) Send(ctx context.Context, uid int64, req *types.SendMessageReq) 
 	}
 
 	item := toItem(msg)
-	// 尽力而为下行推送;对端离线由登录补拉兜底(Pusher 内部只记日志不返错)
-	l.svcCtx.Pusher.Push(ctx, req.TargetUID, opNewMessage, item)
+	// 尽力而为下行推送;ws 不在线走 APNs/厂商通道离线补偿(登录补拉仍是最终兜底)
+	online := l.svcCtx.Pusher.Push(ctx, req.TargetUID, opNewMessage, item)
+	if !online && !isBot {
+		l.offlinePush(ctx, uid, req.TargetUID, conv.ID, previewOf(req.MsgType, content))
+	}
 
 	// AI 管家规则应答:落库并即时推回提问者
 	if isBot {
 		l.botReply(ctx, conv.ID, uid, req.MsgType, content)
 	}
 	return &item, nil
+}
+
+// offlinePush 私信离线推送:同会话 60 秒频控合并(SETNX),避免连续消息轰炸通知栏。
+// 尽力而为:token 缺失/发送失败都只记日志。
+func (l *Logic) offlinePush(ctx context.Context, fromUID, toUID, convID int64, preview string) {
+	if !l.svcCtx.AppPush.Enabled() {
+		return
+	}
+	gateKey := fmt.Sprintf("push:conv:%d:%d", convID, toUID)
+	ok, err := l.svcCtx.Redis.SetnxExCtx(ctx, gateKey, "1", 60)
+	if err != nil || !ok {
+		return
+	}
+	tokens, err := l.svcCtx.PushModel.TokensByUser(ctx, toUID)
+	if err != nil || len(tokens) == 0 {
+		return
+	}
+	sender, err := l.svcCtx.UserModel.FindByID(ctx, fromUID)
+	title := "新私信"
+	if err == nil {
+		title = sender.Nickname + " 给你发来私信"
+	}
+	n := apppush.Notification{
+		Title: title, Body: preview,
+		Deeplink: fmt.Sprintf("yiora://im/conversation/%d", convID),
+	}
+	for _, t := range tokens {
+		l.svcCtx.AppPush.Send(ctx, t.Channel, t.Token, n)
+	}
 }
 
 const (

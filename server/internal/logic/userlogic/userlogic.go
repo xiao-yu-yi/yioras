@@ -134,6 +134,20 @@ func (l *Logic) scanProfileImage(ctx context.Context, imageURL, what string) err
 	return nil
 }
 
+// ReportPushToken 设备推送令牌上报(离线推送;客户端启动/令牌轮换时调用)。
+func (l *Logic) ReportPushToken(ctx context.Context, uid int64, req *types.PushTokenReq) error {
+	if strings.TrimSpace(req.DeviceID) == "" || strings.TrimSpace(req.Token) == "" {
+		return xerr.Param("deviceId 与 token 不能为空")
+	}
+	if len(req.Token) > 255 || len(req.DeviceID) > 32 {
+		return xerr.Param("参数长度非法")
+	}
+	return l.svcCtx.PushModel.UpsertToken(ctx, &model.PushToken{
+		UserID: uid, DeviceID: req.DeviceID,
+		Platform: req.Platform, Channel: req.Channel, Token: req.Token,
+	})
+}
+
 // Settings 用户设置(青少年模式等)。
 func (l *Logic) Settings(ctx context.Context, uid int64) (*types.UserSettingsResp, error) {
 	u, err := l.svcCtx.UserModel.FindByID(ctx, uid)

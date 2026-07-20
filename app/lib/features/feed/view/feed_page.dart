@@ -7,13 +7,14 @@ import '../../../core/router/routes.dart';
 import '../../home/data/home_config_repository.dart';
 import '../../home/widget/home_banner_carousel.dart';
 import '../../home/widget/pinned_post_bar.dart';
+import '../../mall/view/mall_hub_view.dart';
 import '../../software/view/software_library_view.dart';
 import '../controller/feed_controller.dart';
 import '../widget/post_card.dart';
 
 /// 首页（文档 3.2）：顶部一级 Tab「首页 / 应用 / 商城」+ 全局搜索入口。
 /// 首页 Tab：公告 Banner + 置顶精选 + 推荐信息流；应用 Tab：社区软件库（M3）；
-/// 商城 Tab 为 M4 范围，暂提示开发中。
+/// 商城 Tab：忧珠商城聚合入口（M4）。
 class FeedPage extends ConsumerStatefulWidget {
   const FeedPage({super.key});
 
@@ -22,17 +23,17 @@ class FeedPage extends ConsumerStatefulWidget {
 }
 
 class _FeedPageState extends ConsumerState<FeedPage> {
-  /// 0 首页 / 1 应用
+  /// 0 首页 / 1 应用 / 2 商城
   int _tab = 0;
 
-  /// 应用 Tab 是否已进入过（懒加载：未访问不发软件库请求）
-  bool _libraryVisited = false;
+  /// 已进入过的 Tab（懒加载：未访问不发请求）
+  final Set<int> _visited = {0};
 
   void _switchTab(int index) {
     if (index == _tab) return;
     setState(() {
       _tab = index;
-      if (index == 1) _libraryVisited = true;
+      _visited.add(index);
     });
   }
 
@@ -51,7 +52,7 @@ class _FeedPageState extends ConsumerState<FeedPage> {
           ),
         ],
       ),
-      // IndexedStack 保活两个 Tab 的滚动位置；软件库懒加载
+      // IndexedStack 保活各 Tab 的滚动位置；应用/商城懒加载
       body: IndexedStack(
         index: _tab,
         children: [
@@ -64,8 +65,12 @@ class _FeedPageState extends ConsumerState<FeedPage> {
             ),
             _ => const _FeedSkeleton(),
           },
-          if (_libraryVisited)
+          if (_visited.contains(1))
             const SoftwareLibraryView()
+          else
+            const SizedBox.shrink(),
+          if (_visited.contains(2))
+            const MallHubView()
           else
             const SizedBox.shrink(),
         ],
@@ -74,13 +79,7 @@ class _FeedPageState extends ConsumerState<FeedPage> {
   }
 }
 
-void _showComingSoon(BuildContext context, String name) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text('「$name」正在开发中，敬请期待')));
-}
-
-/// 顶部一级导航：首页 / 应用 / 商城(M4)，选中项加粗 + 品牌色下划线
+/// 顶部一级导航：首页 / 应用 / 商城，选中项加粗 + 品牌色下划线
 class _TopTabs extends StatelessWidget {
   const _TopTabs({required this.current, required this.onChanged});
 
@@ -126,7 +125,7 @@ class _TopTabs extends StatelessWidget {
       children: [
         tab('首页', active: current == 0, onTap: () => onChanged(0)),
         tab('应用', active: current == 1, onTap: () => onChanged(1)),
-        tab('商城', onTap: () => _showComingSoon(context, '商城')),
+        tab('商城', active: current == 2, onTap: () => onChanged(2)),
       ],
     );
   }

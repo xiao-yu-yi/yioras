@@ -36,6 +36,8 @@ class PublishRepositoryHttp implements PublishRepository {
       circleId: draft.circle!.id,
       topics: draft.topics,
       imageUrls: urls,
+      paidPrice: draft.paidPrice,
+      paidContent: draft.paidContent,
     );
   });
 

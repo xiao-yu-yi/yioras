@@ -349,6 +349,16 @@ $blkGone = (Invoke-RestMethod "$api/posts/$($imgBlk.data.postId)").code
 $blkNotice = @((Invoke-RestMethod "$api/notifications?type=3" -Headers $h1).data | Where-Object { $_.targetId -eq $imgBlk.data.postId }).Count
 Write-Output "[12.36] reviewImg posted=$($imgRev.data.status) queued=$revQueued (expect 1) stillVisible=code$revVisible (expect 0); blockImg gone=code$blkGone (expect 40400) authorNotified=$blkNotice (expect 1)"
 
+# 12.37 offline push (mock channel): B registers token, A DMs offline B twice -> exactly one deduped mock push in redis
+PostJson "$api/users/$uidB/follow" @{} $h1 | Out-Null # ensure mutual follow so DM daily cap does not interfere
+Invoke-RestMethod -Method Post -Uri "$api/user/push-token" -Headers $h2 -ContentType 'application/json' -Body (@{deviceId = $lb.data.deviceId; platform = "android"; channel = "mock"; token = "smoketok-b"} | ConvertTo-Json -Compress) | Out-Null
+PostJson "$api/im/messages" @{targetUid = $uidB; msgType = 1; content = "offline ping 1"} $h1 | Out-Null
+PostJson "$api/im/messages" @{targetUid = $uidB; msgType = 1; content = "offline ping 2"} $h1 | Out-Null
+$pushCnt = (docker compose exec -T redis redis-cli GET mockpush:count:smoketok-b | Out-String).Trim()
+$pushLast = (docker compose exec -T redis redis-cli GET mockpush:last:smoketok-b | Out-String).Trim()
+$pushHasLink = $pushLast.Contains('yiora://im/conversation/')
+Write-Output "[12.37] offlinePush count=$pushCnt (expect 1, 60s dedup) deeplink=$pushHasLink (expect True)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

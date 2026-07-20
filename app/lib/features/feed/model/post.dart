@@ -47,6 +47,9 @@ class Post {
     this.likeCount = 0,
     this.commentCount = 0,
     this.isTop = false,
+    this.paidPrice = 0,
+    this.unlocked = false,
+    this.paidContent = '',
     required this.createdAt,
   });
 
@@ -63,7 +66,18 @@ class Post {
 
   /// 运营置顶精选
   final bool isTop;
+
+  /// 忧珠付费解锁价格，>0 为付费帖（content 为免费摘要段）
+  final int paidPrice;
+
+  /// 当前用户是否可看付费段（作者恒 true，服务端按登录态下发）
+  final bool unlocked;
+
+  /// 付费全文段（仅详情且已解锁时下发）
+  final String paidContent;
   final DateTime createdAt;
+
+  bool get isPaid => paidPrice > 0;
 
   factory Post.fromJson(Map<String, dynamic> json) => Post(
     id: (json['id'] as num).toInt(),
@@ -81,8 +95,30 @@ class Post {
     likeCount: (json['likeCount'] as num?)?.toInt() ?? 0,
     commentCount: (json['commentCount'] as num?)?.toInt() ?? 0,
     isTop: json['isTop'] as bool? ?? false,
+    paidPrice: (json['paidPrice'] as num?)?.toInt() ?? 0,
+    unlocked: json['unlocked'] as bool? ?? false,
+    paidContent: json['paidContent'] as String? ?? '',
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+  );
+
+  /// 解锁成功后的本地更新
+  Post copyWith({bool? unlocked, String? paidContent}) => Post(
+    id: id,
+    author: author,
+    title: title,
+    content: content,
+    circleName: circleName,
+    images: images,
+    topics: topics,
+    viewCount: viewCount,
+    likeCount: likeCount,
+    commentCount: commentCount,
+    isTop: isTop,
+    paidPrice: paidPrice,
+    unlocked: unlocked ?? this.unlocked,
+    paidContent: paidContent ?? this.paidContent,
+    createdAt: createdAt,
   );
 
   Map<String, dynamic> toJson() => {
@@ -97,6 +133,9 @@ class Post {
     'likeCount': likeCount,
     'commentCount': commentCount,
     'isTop': isTop,
+    'paidPrice': paidPrice,
+    'unlocked': unlocked,
+    'paidContent': paidContent,
     'createdAt': createdAt.toIso8601String(),
   };
 }

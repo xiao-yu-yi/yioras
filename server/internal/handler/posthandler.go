@@ -102,6 +102,25 @@ func resolveShareHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+func pushTokenHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := mustUID(w, r)
+		if !ok {
+			return
+		}
+		var req types.PushTokenReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := userlogic.New(svcCtx).ReportPushToken(r.Context(), uid, &req); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	}
+}
+
 func userSettingsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, ok := mustUID(w, r)
