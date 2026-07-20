@@ -1,0 +1,32 @@
+# ---- 通用 ----
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.prod
+.env.local
+
+# ---- Go (server) ----
+server/bin/
+server/*.exe
+server/coverage.out
+
+# ---- Node (admin-web) ----
+admin-web/node_modules/
+admin-web/dist/
+admin-web/tsconfig.tsbuildinfo
+
+# ---- Flutter (app) ----
+app/build/
+app/.dart_tool/
+app/.gradle/
+app/android/.gradle/
+app/android/local.properties
+app/ios/Flutter/ephemeral/
+app/*.apk
+app/pubspec.lock.bak
+
+# ---- IDE ----
+.idea/
+.vscode/
+*.iml
