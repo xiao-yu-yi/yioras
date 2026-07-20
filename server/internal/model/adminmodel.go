@@ -1398,6 +1398,66 @@ func (m *AdminModel) SaveAgreement(ctx context.Context, kind, title, content str
 	return nil
 }
 
+// AdminSoftwareRow 软件库管理行。
+type AdminSoftwareRow struct {
+	ID            int64     `db:"id"`
+	UserID        int64     `db:"user_id"`
+	Nickname      string    `db:"nickname"`
+	Name          string    `db:"name"`
+	Logo          string    `db:"logo"`
+	Type          int64     `db:"type"`
+	CategoryName  string    `db:"category_name"`
+	Status        int64     `db:"status"`
+	DownloadCount int64     `db:"download_count"`
+	CommentCount  int64     `db:"comment_count"`
+	CreatedAt     time.Time `db:"created_at"`
+}
+
+// ListSoftwareAdmin 软件库检索:名称/简介关键词 + 状态筛选(-1 全部)。
+func (m *AdminModel) ListSoftwareAdmin(ctx context.Context, kw string, status int64, offset, limit int) ([]AdminSoftwareRow, int64, error) {
+	where, args := "1=1", []any{}
+	if kw != "" {
+		p := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(kw) + "%"
+		where += " AND (s.name LIKE ? OR s.intro LIKE ?)"
+		args = append(args, p, p)
+	}
+	if status >= 0 {
+		where += " AND s.status = ?"
+		args = append(args, status)
+	}
+	var total int64
+	if err := m.conn.QueryRowCtx(ctx, &total,
+		"SELECT COUNT(1) FROM `software` s WHERE "+where, args...); err != nil {
+		return nil, 0, fmt.Errorf("count software: %w", err)
+	}
+	var rows []AdminSoftwareRow
+	q := `SELECT s.id, s.user_id, u.nickname, s.name, s.logo, s.type, COALESCE(c.name, '') AS category_name,
+	             s.status, s.download_count, s.comment_count, s.created_at
+	      FROM software s
+	      JOIN user u ON u.id = s.user_id
+	      LEFT JOIN software_category c ON c.id = s.category_id
+	      WHERE ` + where + " ORDER BY s.id DESC LIMIT ?, ?"
+	args = append(args, offset, limit)
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, args...); err != nil {
+		return nil, 0, fmt.Errorf("list software admin: %w", err)
+	}
+	return rows, total, nil
+}
+
+// SetSoftwareStatus 软件上下架,返回作者 ID 供通知;只在上架态与下架态之间流转。
+func (m *AdminModel) SetSoftwareStatus(ctx context.Context, id, status int64) (int64, error) {
+	var userID int64
+	if err := m.conn.QueryRowCtx(ctx, &userID,
+		"SELECT user_id FROM `software` WHERE id = ? LIMIT 1", id); err != nil {
+		return 0, err
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `software` SET status = ? WHERE id = ?", status, id); err != nil {
+		return 0, fmt.Errorf("set software status: %w", err)
+	}
+	return userID, nil
+}
+
 // LevelRuleRow 等级经验阈值行。
 type LevelRuleRow struct {
 	Level   int64 `db:"level"`

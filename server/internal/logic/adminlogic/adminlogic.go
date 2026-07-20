@@ -18,6 +18,7 @@ import (
 	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/logic/userlogic"
 	"github.com/yiora/server/internal/model"
+	"github.com/yiora/server/internal/logic/authlogic"
 	"github.com/yiora/server/internal/pkg/apppush"
 	"github.com/yiora/server/internal/pkg/captcha"
 	"github.com/yiora/server/internal/pkg/jwtx"
@@ -751,6 +752,86 @@ func (l *Logic) PublishNotice(ctx context.Context, adminID int64, req *types.Adm
 // Agreement 协议内容(用户侧/后台共用读取)。
 // agreementKinds 协议/静态文案合法类型;bot_prompt 为管家 LLM 系统提示词(仅后台可读写,用户侧接口拒绝)。
 var agreementKinds = map[string]bool{"user": true, "privacy": true, "bot_prompt": true}
+
+// SoftwaresAdmin 软件库检索(全状态,含待审/驳回/下架)。
+func (l *Logic) SoftwaresAdmin(ctx context.Context, req *types.AdminSoftwareListReq) (*types.AdminSoftwareListResp, error) {
+	offset, limit := req.Offset()
+	rows, total, err := l.svcCtx.AdminModel.ListSoftwareAdmin(ctx, strings.TrimSpace(req.Kw), req.Status, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &types.AdminSoftwareListResp{Total: total, List: make([]types.AdminSoftwareItem, 0, len(rows))}
+	for _, r := range rows {
+		out.List = append(out.List, types.AdminSoftwareItem{
+			ID: r.ID, UserID: r.UserID, Nickname: r.Nickname, Name: r.Name, Logo: r.Logo,
+			Type: r.Type, CategoryName: r.CategoryName, Status: r.Status,
+			DownloadCount: r.DownloadCount, CommentCount: r.CommentCount,
+			CreatedAt: r.CreatedAt.UnixMilli(),
+		})
+	}
+	return out, nil
+}
+
+// SoftwareOps 软件上下架:下架通知发布者(必填原因),恢复回上架态。
+func (l *Logic) SoftwareOps(ctx context.Context, adminID int64, req *types.AdminSoftwareOpsReq, ip string) error {
+	down := req.Action == 1
+	if down && strings.TrimSpace(req.Reason) == "" {
+		return xerr.Param("下架必须填写原因")
+	}
+	status := int64(model.SoftwareStatusOnline)
+	if down {
+		status = model.SoftwareStatusTakenDown
+	}
+	userID, err := l.svcCtx.AdminModel.SetSoftwareStatus(ctx, req.ID, status)
+	if err != nil {
+		if model.IsNotFound(err) {
+			return xerr.New(xerr.CodeNotFound, "软件不存在")
+		}
+		return err
+	}
+	text := "你的软件已恢复上架"
+	if down {
+		text = "你的软件因违规被下架: " + req.Reason
+	}
+	if err := l.svcCtx.NotifyModel.Add(ctx, &model.Notification{
+		UserID: userID, Type: model.NotifyTypeSystem, TargetID: req.ID, Content: text,
+	}); err != nil {
+		logx.WithContext(ctx).Errorf("software ops notification: %v", err)
+	}
+	l.opLog(ctx, adminID, fmt.Sprintf("software.%s", map[bool]string{true: "takedown", false: "restore"}[down]),
+		fmt.Sprintf("software:%d", req.ID), req.Reason, ip)
+	return nil
+}
+
+// SoftwareVersionsAdmin 软件全部版本(含待审/驳回)。
+func (l *Logic) SoftwareVersionsAdmin(ctx context.Context, softwareID int64) ([]types.AdminSoftwareVersionItem, error) {
+	rows, err := l.svcCtx.SoftwareModel.Versions(ctx, softwareID, false)
+	if err != nil {
+		return nil, fmt.Errorf("list versions: %w", err)
+	}
+	out := make([]types.AdminSoftwareVersionItem, 0, len(rows))
+	for _, v := range rows {
+		out = append(out, types.AdminSoftwareVersionItem{
+			ID: v.ID, Version: v.Version, Size: v.Size, Channel: v.Channel,
+			Status: v.Status, CreatedAt: v.CreatedAt.UnixMilli(),
+		})
+	}
+	return out, nil
+}
+
+// UserDevicesAdmin 管理侧查看用户在线设备(风控排查)。
+func (l *Logic) UserDevicesAdmin(ctx context.Context, uid int64) ([]types.DeviceItem, error) {
+	return authlogic.New(l.svcCtx).Devices(ctx, uid, "")
+}
+
+// KickUserDevice 管理侧强制踢设备(存量令牌即时失效)。
+func (l *Logic) KickUserDevice(ctx context.Context, adminID int64, req *types.AdminKickDeviceReq, ip string) error {
+	if err := authlogic.New(l.svcCtx).KickDevice(ctx, req.UserID, strings.TrimSpace(req.DeviceID)); err != nil {
+		return err
+	}
+	l.opLog(ctx, adminID, "user.device.kick", fmt.Sprintf("user:%d device:%s", req.UserID, req.DeviceID), "", ip)
+	return nil
+}
 
 // LevelRules 等级经验阈值表。
 func (l *Logic) LevelRules(ctx context.Context) ([]types.LevelRuleItem, error) {

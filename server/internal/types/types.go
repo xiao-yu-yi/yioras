@@ -130,6 +130,55 @@ type BotStatsResp struct {
 	Days []BotStatDay `json:"days"`
 }
 
+// ---- 软件库管理 ----
+
+type AdminSoftwareListReq struct {
+	Kw     string `form:"kw,optional"`
+	Status int64  `form:"status,default=-1"` // -1全部 0待审 1上架 2驳回 3下架
+	PageReq
+}
+
+type AdminSoftwareItem struct {
+	ID            int64  `json:"id"`
+	UserID        int64  `json:"userId"`
+	Nickname      string `json:"nickname"`
+	Name          string `json:"name"`
+	Logo          string `json:"logo"`
+	Type          int64  `json:"type"` // 1应用 2游戏
+	CategoryName  string `json:"categoryName"`
+	Status        int64  `json:"status"`
+	DownloadCount int64  `json:"downloadCount"`
+	CommentCount  int64  `json:"commentCount"`
+	CreatedAt     int64  `json:"createdAt"`
+}
+
+type AdminSoftwareListResp struct {
+	Total int64               `json:"total"`
+	List  []AdminSoftwareItem `json:"list"`
+}
+
+type AdminSoftwareOpsReq struct {
+	ID     int64  `path:"id"`
+	Action int64  `json:"action,options=0|1"` // 1下架 0恢复上架
+	Reason string `json:"reason,optional"`    // 下架必填,通知发布者
+}
+
+type AdminSoftwareVersionItem struct {
+	ID        int64  `json:"id"`
+	Version   string `json:"version"`
+	Size      string `json:"size"`
+	Channel   string `json:"channel"`
+	Status    int64  `json:"status"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// ---- 用户设备管理(管理侧) ----
+
+type AdminKickDeviceReq struct {
+	UserID   int64  `path:"id"`
+	DeviceID string `json:"deviceId"`
+}
+
 // ---- 等级规则管理 ----
 
 type LevelRuleItem struct {

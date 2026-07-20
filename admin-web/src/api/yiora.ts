@@ -325,6 +325,18 @@ export const api = {
   levelRules: () => http.get('/levels') as Promise<LevelRuleItem[]>,
   saveLevelRules: (rules: LevelRuleItem[]) => http.post('/levels', { rules }),
 
+  // 软件库管理
+  softwares: (p: { kw?: string; status?: number; page?: number }) =>
+    http.get('/software', { params: { size: 20, ...p } }) as Promise<{ total: number; list: AdminSoftwareItem[] }>,
+  softwareOps: (id: number, action: 0 | 1, reason = '') => http.post(`/software/${id}/ops`, { action, reason }),
+  softwareVersions: (id: number) =>
+    http.get(`/software/${id}/versions`) as Promise<AdminSoftwareVersionItem[]>,
+
+  // 用户设备(风控)
+  userDevices: (uid: number) =>
+    http.get(`/users/${uid}/devices`) as Promise<{ deviceId: string; name: string; ip: string; lastLoginAt: number }[]>,
+  kickUserDevice: (uid: number, deviceId: string) => http.post(`/users/${uid}/devices/kick`, { deviceId }),
+
   // 推送渠道看板
   pushStats: (days = 7) =>
     http.get('/push/stats', { params: { days } }) as Promise<{
@@ -371,6 +383,29 @@ export interface AdminYouzhuLogItem {
 export interface LevelRuleItem {
   level: number
   needExp: number
+}
+
+export interface AdminSoftwareItem {
+  id: number
+  userId: number
+  nickname: string
+  name: string
+  logo: string
+  type: number
+  categoryName: string
+  status: number
+  downloadCount: number
+  commentCount: number
+  createdAt: number
+}
+
+export interface AdminSoftwareVersionItem {
+  id: number
+  version: string
+  size: string
+  channel: string
+  status: number
+  createdAt: number
 }
 
 export interface AdminPrettyNoItem {

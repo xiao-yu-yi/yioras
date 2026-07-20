@@ -38,6 +38,12 @@ export default [
         name: "Topics",
         component: () => import("@/views/yiora/TopicsView.vue"),
         meta: { title: "话题管理", icon: "ep/collection-tag" }
+      },
+      {
+        path: "/software-manage",
+        name: "SoftwareManage",
+        component: () => import("@/views/yiora/SoftwareManageView.vue"),
+        meta: { title: "软件库管理", icon: "ep/box" }
       }
     ]
   },

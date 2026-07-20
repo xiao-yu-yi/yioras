@@ -934,6 +934,84 @@ func adminSaveAgreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminSoftwaresHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.AdminSoftwareListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).SoftwaresAdmin(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminSoftwareOpsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminSoftwareOpsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).SoftwareOps(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
+func adminSoftwareVersionsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.IDPath
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).SoftwareVersionsAdmin(r.Context(), req.ID)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminUserDevicesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.IDPath
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).UserDevicesAdmin(r.Context(), req.ID)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminKickDeviceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminKickDeviceReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).KickUserDevice(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
 func adminLevelRulesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
 		out, err := adminlogic.New(svcCtx).LevelRules(r.Context())

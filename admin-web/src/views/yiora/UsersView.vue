@@ -53,11 +53,12 @@
       <el-table-column label="最近登录" width="160">
         <template #default="{ row }">{{ row.lastLoginAt ? fmt(row.lastLoginAt) : '从未登录' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="170" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <template v-if="row.status !== 4">
             <el-button size="small" type="warning" @click="openBan(row)">处置</el-button>
             <el-button size="small" @click="openGrow(row)">等级/头衔</el-button>
+            <el-button size="small" @click="openDevices(row)">设备</el-button>
           </template>
           <span v-else class="sub">不可操作</span>
         </template>
@@ -108,6 +109,25 @@
           <el-button size="small" type="info" :loading="submitting" @click="title(2, false)">撤销</el-button>
         </el-form-item>
       </el-form>
+    </el-dialog>
+
+    <!-- 设备管理:登录设备排查与强制下线(存量令牌即时失效) -->
+    <el-dialog v-model="devDialog" :title="`登录设备 - ${devUser?.nickname ?? ''}`" width="560px">
+      <el-table :data="devices" v-loading="devLoading" size="small">
+        <el-table-column prop="name" label="设备" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.name || '未命名设备' }}</template>
+        </el-table-column>
+        <el-table-column prop="ip" label="最近 IP" width="130" />
+        <el-table-column label="最近活跃" width="160">
+          <template #default="{ row }">{{ fmt(row.lastLoginAt) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" @click="kickDevice(row)">踢下线</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!devLoading && devices.length === 0" description="该用户当前没有在线设备" :image-size="72" />
     </el-dialog>
   </el-card>
 </template>
@@ -172,6 +192,41 @@ function openGrow(row: AdminUserItem) {
   current.value = row
   growLevel.value = row.level
   growDialog.value = true
+}
+
+interface DeviceRow {
+  deviceId: string
+  name: string
+  ip: string
+  lastLoginAt: number
+}
+const devDialog = ref(false)
+const devLoading = ref(false)
+const devUser = ref<AdminUserItem | null>(null)
+const devices = ref<DeviceRow[]>([])
+
+async function openDevices(row: AdminUserItem) {
+  devUser.value = row
+  devDialog.value = true
+  devLoading.value = true
+  try {
+    devices.value = (await api.userDevices(row.id)) ?? []
+  } finally {
+    devLoading.value = false
+  }
+}
+
+async function kickDevice(row: DeviceRow) {
+  if (!devUser.value) return
+  const ok = await ElMessageBox.confirm(
+    `将该设备踢下线?其登录态与刷新令牌即时失效。`,
+    '踢下线',
+    { type: 'warning' },
+  ).catch(() => null)
+  if (!ok) return
+  await api.kickUserDevice(devUser.value.id, row.deviceId)
+  ElMessage.success('已踢下线')
+  openDevices(devUser.value)
 }
 
 async function saveLevel() {

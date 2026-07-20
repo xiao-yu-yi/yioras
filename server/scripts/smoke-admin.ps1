@@ -397,6 +397,23 @@ $lvAfter = (Invoke-RestMethod "$adm/levels" -Headers $ha).data
 PostJson "$adm/levels" @{rules = @($lv | ForEach-Object { @{level = $_.level; needExp = $_.needExp} })} $ha | Out-Null
 Write-Output "[12.41] levels=$($lv.Count) (expect 11) badSave=code$($lvBad.code) (expect 40000) addLevel=code$($lvSave.code) after=$($lvAfter.Count) (expect 12)"
 
+# 12.42 software library manage: search all-status, takedown hides from public list, restore brings it back
+$swList = (Invoke-RestMethod "$adm/software?kw=Toolbox&status=-1" -Headers $ha).data
+$swId = $swList.list[0].id
+$swVers = (Invoke-RestMethod "$adm/software/$swId/versions" -Headers $ha).data
+$swDown = PostJson "$adm/software/$swId/ops" @{action = 1; reason = "smoke takedown"} $ha
+$pubGone = @(((Invoke-RestMethod "$api/software?type=1").data) | Where-Object { $_.id -eq $swId }).Count
+$swBadDown = PostJson "$adm/software/$swId/ops" @{action = 1} $ha
+$swUp = PostJson "$adm/software/$swId/ops" @{action = 0} $ha
+$pubBack = @(((Invoke-RestMethod "$api/software?type=1").data) | Where-Object { $_.id -eq $swId }).Count
+Write-Output "[12.42] swSearch total=$($swList.total) (>=1) versions=$($swVers.Count) (>=2); takedown=code$($swDown.code) pubGone=$pubGone (expect 0) noReason=code$($swBadDown.code) (expect 40000); restore=code$($swUp.code) pubBack=$pubBack (expect 1)"
+
+# 12.43 admin device management: list user devices, force-kick the exact device behind $h2 -> its token dies instantly
+$devs = (Invoke-RestMethod "$adm/users/$uidB/devices" -Headers $ha).data
+$kick = PostJson "$adm/users/$uidB/devices/kick" @{deviceId = $lb.data.deviceId} $ha
+$deadMe = Invoke-RestMethod "$api/user/me" -Headers $h2
+Write-Output "[12.43] devices=$(@($devs).Count) (>=1) kick=code$($kick.code) kickedToken=code$($deadMe.code) (expect 40100)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null
