@@ -1,0 +1,49 @@
+/* 全局基调:浅灰工作台 + 统一卡片质感 */
+:root {
+  --yiora-sidebar: #1d2b3f;
+  --yiora-sidebar-active: #2c3e57;
+  --yiora-accent: #409eff;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  background: #f5f7fa;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 卡片统一圆角与轻阴影 */
+.el-card {
+  border-radius: 10px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(31, 45, 61, 0.08) !important;
+}
+.el-card__header {
+  font-weight: 600;
+  color: #24334a;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+/* 表格:去重边框感,行 hover 更柔和 */
+.el-table {
+  --el-table-border-color: #f0f2f5;
+  --el-table-row-hover-bg-color: #f6f9ff;
+}
+.el-table th.el-table__cell {
+  background: #fafbfd;
+  color: #5b6b81;
+  font-weight: 600;
+}
+
+/* 弹窗圆角 */
+.el-dialog {
+  border-radius: 12px;
+}
+
+/* 分页靠右时的间距在各页 scoped 里控制,这里统一字号 */
+.el-pagination {
+  --el-pagination-font-size: 13px;
+}

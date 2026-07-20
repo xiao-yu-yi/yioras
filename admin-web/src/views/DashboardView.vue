@@ -4,8 +4,13 @@
       <el-col v-for="card in cards" :key="card.label" :span="6" class="col">
         <el-card shadow="hover">
           <div class="metric">
-            <div class="value">{{ card.value }}</div>
-            <div class="label">{{ card.label }}</div>
+            <div class="metric-icon" :style="{ background: card.bg }">
+              <el-icon :size="22" color="#fff"><component :is="card.icon" /></el-icon>
+            </div>
+            <div>
+              <div class="value">{{ card.value }}</div>
+              <div class="label">{{ card.label }}</div>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -37,6 +42,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
+import {
+  ChatDotSquare,
+  Coin,
+  Files,
+  Sunrise,
+  TrendCharts,
+  User,
+  View,
+  Warning,
+} from '@element-plus/icons-vue'
 import { api, type Dashboard } from '../api'
 
 const data = ref<Dashboard | null>(null)
@@ -49,14 +64,14 @@ const cards = computed(() => {
   const d = data.value
   if (!d) return []
   return [
-    { label: '注册用户', value: d.users },
-    { label: '今日新增', value: d.todayUsers },
-    { label: '今日活跃', value: d.todayActive },
-    { label: '待审积压', value: d.pendingAudits },
-    { label: '已发布帖子', value: d.posts },
-    { label: '今日发帖', value: d.todayPosts },
-    { label: '上架软件', value: d.software },
-    { label: '忧珠发放/消耗', value: `${d.youzhuIssued} / ${d.youzhuBurned}` },
+    { label: '注册用户', value: d.users, icon: User, bg: 'linear-gradient(135deg,#409eff,#6db3ff)' },
+    { label: '今日新增', value: d.todayUsers, icon: Sunrise, bg: 'linear-gradient(135deg,#7a5af8,#a18bff)' },
+    { label: '今日活跃', value: d.todayActive, icon: TrendCharts, bg: 'linear-gradient(135deg,#00b578,#4cd8a6)' },
+    { label: '待审积压', value: d.pendingAudits, icon: Warning, bg: 'linear-gradient(135deg,#ff8f1f,#ffb45e)' },
+    { label: '已发布帖子', value: d.posts, icon: Files, bg: 'linear-gradient(135deg,#3ba3f8,#7cc4ff)' },
+    { label: '今日发帖', value: d.todayPosts, icon: ChatDotSquare, bg: 'linear-gradient(135deg,#f65e8c,#ff9ab8)' },
+    { label: '上架软件', value: d.software, icon: View, bg: 'linear-gradient(135deg,#00b8d9,#5cd6e8)' },
+    { label: '忧珠发放/消耗', value: `${d.youzhuIssued} / ${d.youzhuBurned}`, icon: Coin, bg: 'linear-gradient(135deg,#f7b500,#ffd45e)' },
   ]
 })
 
@@ -107,16 +122,28 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 .metric {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.metric-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .value {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
-  color: #303133;
+  color: #24334a;
+  line-height: 1.2;
 }
 .label {
-  margin-top: 6px;
-  color: #909399;
+  margin-top: 4px;
+  color: #8a97a8;
   font-size: 13px;
 }
 .alert {

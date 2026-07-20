@@ -2,7 +2,13 @@
   <div class="login-wrap">
     <el-card class="login-card">
       <template #header>
-        <div class="title">Yiora 管理后台</div>
+        <div class="title">
+          <div class="title-logo">Y</div>
+          <div>
+            <div class="title-main">Yiora 管理后台</div>
+            <div class="title-sub">社区运营与内容安全工作台</div>
+          </div>
+        </div>
       </template>
       <el-form v-if="!ticket" :model="form" label-width="0" @keyup.enter="submit">
         <el-form-item>
@@ -133,12 +139,38 @@ onMounted(refreshCaptcha)
   background: linear-gradient(135deg, #1f2d3d 0%, #2f4056 100%);
 }
 .login-card {
-  width: 360px;
+  width: 380px;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28) !important;
 }
 .title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+.title-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #409eff, #7a5af8);
+  color: #fff;
+  font-weight: 800;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.title-main {
   font-size: 18px;
-  font-weight: 600;
-  text-align: center;
+  font-weight: 700;
+  color: #24334a;
+  line-height: 1.2;
+}
+.title-sub {
+  font-size: 12px;
+  color: #8a97a8;
+  margin-top: 2px;
 }
 .captcha-row {
   display: flex;
