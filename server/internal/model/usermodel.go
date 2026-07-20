@@ -140,6 +140,20 @@ func (m *UserModel) PushPrefs(ctx context.Context, uid int64) (int64, error) {
 	return prefs, err
 }
 
+// NextLevelNeed 升到 level+1 所需累计经验;已是最高档返回 0(客户端进度条分母)。
+func (m *UserModel) NextLevelNeed(ctx context.Context, level int64) (int64, error) {
+	var need int64
+	err := m.conn.QueryRowCtx(ctx, &need,
+		"SELECT need_exp FROM `level_rule` WHERE level = ? LIMIT 1", level+1)
+	if err != nil {
+		if IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return need, nil
+}
+
 // SetTeenMode 青少年模式开关。
 func (m *UserModel) SetTeenMode(ctx context.Context, uid int64, on bool) error {
 	v := 0

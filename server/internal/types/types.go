@@ -191,6 +191,26 @@ type AdminKickDeviceReq struct {
 	DeviceID string `json:"deviceId"`
 }
 
+// ---- 运营参数(app_config) ----
+
+type AppConfigListReq struct {
+	Prefix string `form:"prefix,optional"` // 如 exp.
+}
+
+type AppConfigItem struct {
+	K         string `json:"k"`
+	V         string `json:"v"`
+	Remark    string `json:"remark"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+type AppConfigSaveReq struct {
+	Items []struct {
+		K string `json:"k"`
+		V string `json:"v"`
+	} `json:"items"`
+}
+
 // ---- 等级规则管理 ----
 
 type LevelRuleItem struct {
@@ -283,13 +303,15 @@ type TokenResp struct {
 }
 
 type UserInfoResp struct {
-	UserID    int64  `json:"userId"`
-	DisplayNo string `json:"displayNo"`
-	Nickname  string `json:"nickname"`
-	Avatar    string `json:"avatar"`
-	Cover     string `json:"cover"`
-	Signature string `json:"signature"`
-	Level     int64  `json:"level"`
+	UserID       int64  `json:"userId"`
+	DisplayNo    string `json:"displayNo"`
+	Nickname     string `json:"nickname"`
+	Avatar       string `json:"avatar"`
+	Cover        string `json:"cover"`
+	Signature    string `json:"signature"`
+	Level        int64  `json:"level"`
+	Exp          int64  `json:"exp"`          // 当前累计经验
+	NextLevelExp int64  `json:"nextLevelExp"` // 升下一级所需累计经验;0=已满级
 }
 
 // ---- 通用 ----

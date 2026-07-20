@@ -31,6 +31,7 @@ func main() {
 	handler.RegisterHandlers(server, svcCtx)
 
 	go reconcileDaemon(svcCtx)
+	go hotScoreDaemon(svcCtx)
 	if svcCtx.Meili != nil {
 		interval := time.Duration(c.Search.SyncIntervalSec) * time.Second
 		if interval <= 0 {
@@ -40,6 +41,32 @@ func main() {
 	}
 
 	server.Start()
+}
+
+// hotScoreDaemon 热度分周期重算(需求 3.2 推荐流排序):
+// 时间衰减+互动热度+运营加权,公式见 PostModel.RecalcHotScores;互动实时增量只是两次重算间的近似。
+// 启动即跑一轮(冷启动修正),此后每小时重算。
+func hotScoreDaemon(svcCtx *svc.ServiceContext) {
+	defer func() {
+		if r := recover(); r != nil {
+			logx.Errorf("hot score daemon panic: %v", r)
+		}
+	}()
+	run := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := svcCtx.PostModel.RecalcHotScores(ctx); err != nil {
+			logx.Errorf("hot score recalc: %v", err)
+			return
+		}
+		logx.Info("hot score recalc done")
+	}
+	run()
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		run()
+	}
 }
 
 // reconcileDaemon 忧珠每日对账巡检:余额与流水合计不平的账户告警(需求 3.10)。

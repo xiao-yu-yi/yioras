@@ -883,6 +883,41 @@ func (l *Logic) KickUserDevice(ctx context.Context, adminID int64, req *types.Ad
 	return nil
 }
 
+// AppConfigs 运营参数列表(按前缀,当前用于成长参数 exp.*)。
+func (l *Logic) AppConfigs(ctx context.Context, prefix string) ([]types.AppConfigItem, error) {
+	rows, err := l.svcCtx.ConfigModel.ListByPrefix(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]types.AppConfigItem, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, types.AppConfigItem{K: r.K, V: r.V, Remark: r.Remark, UpdatedAt: r.UpdatedAt.UnixMilli()})
+	}
+	return out, nil
+}
+
+// SaveAppConfigs 批量保存运营参数(只允许改既有键的值;数值键校验非负整数)。
+func (l *Logic) SaveAppConfigs(ctx context.Context, adminID int64, req *types.AppConfigSaveReq, ip string) error {
+	if len(req.Items) == 0 {
+		return xerr.Param("没有要保存的参数")
+	}
+	for _, it := range req.Items {
+		v := strings.TrimSpace(it.V)
+		if n, err := strconv.ParseInt(v, 10, 64); err != nil || n < 0 {
+			return xerr.Param(fmt.Sprintf("参数 %s 必须是非负整数", it.K))
+		}
+		ok, err := l.svcCtx.ConfigModel.Save(ctx, it.K, v)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return xerr.Param("参数不存在: " + it.K)
+		}
+	}
+	l.opLog(ctx, adminID, "ops.config.save", fmt.Sprintf("items:%d", len(req.Items)), "", ip)
+	return nil
+}
+
 // LevelRules 等级经验阈值表。
 func (l *Logic) LevelRules(ctx context.Context) ([]types.LevelRuleItem, error) {
 	rows, err := l.svcCtx.AdminModel.ListLevelRules(ctx)

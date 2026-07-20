@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/yiora/server/internal/logic/draftlogic"
+	"github.com/yiora/server/internal/logic/growth"
 	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/imgscan"
@@ -36,6 +37,11 @@ const (
 	minPaidPrice     = 1
 	maxPaidPrice     = 1000
 	unlockFeePercent = 10
+
+	// 互动 → 热度实时增量权重(真值由周期重算公式兜底,见 PostModel.RecalcHotScores)
+	hotLike     = 10
+	hotComment  = 15
+	hotFavorite = 12
 )
 
 type Logic struct {
@@ -150,7 +156,7 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 	l.scanImagesAsync(postID, uid, req.Images)
 	if status == model.PostStatusPublished {
 		l.taskProgress(ctx, uid, "post")
-		l.addExp(ctx, uid, 5)
+		growth.Grant(ctx, l.svcCtx, uid, growth.KindPost)
 		// @通知与共创邀请通知仅对已发布帖发送;待审帖过审后由后台补发(M2 后台流程)
 		brief := postBrief(&model.Post{Title: texts[0], Content: texts[1]})
 		for _, m := range mentions {
@@ -368,13 +374,6 @@ func (l *Logic) ConfirmCocreate(ctx context.Context, uid, postID int64, accept b
 func (l *Logic) taskProgress(ctx context.Context, uid int64, action string) {
 	if err := l.svcCtx.TaskModel.IncrProgress(ctx, uid, action, time.Now()); err != nil {
 		logx.WithContext(ctx).Errorf("task progress %s: %v", action, err)
-	}
-}
-
-// addExp 行为经验(等级成长),失败不阻塞主流程。
-func (l *Logic) addExp(ctx context.Context, uid, exp int64) {
-	if err := l.svcCtx.UserModel.AddExp(ctx, uid, exp); err != nil {
-		logx.WithContext(ctx).Errorf("add exp: %v", err)
 	}
 }
 
@@ -620,7 +619,8 @@ func (l *Logic) Detail(ctx context.Context, uid, postID int64) (*types.PostItem,
 			} else {
 				p.ViewCount++
 			}
-			l.taskProgress(ctx, uid, "browse") // 24h 去重后的有效浏览才计任务
+			l.svcCtx.PostModel.BumpHotScore(ctx, postID, 1) // 有效浏览计热度
+			l.taskProgress(ctx, uid, "browse")              // 24h 去重后的有效浏览才计任务
 		}
 		if err := l.svcCtx.PostModel.UpsertViewHistory(ctx, uid, postID); err != nil {
 			logx.WithContext(ctx).Errorf("post %d view history: %v", postID, err)
@@ -728,9 +728,11 @@ func (l *Logic) Like(ctx context.Context, uid, postID int64) error {
 			TargetType: model.LikeTargetPost, TargetID: postID,
 			Content: "赞了你的帖子 " + postBrief(p),
 		})
+		growth.Grant(ctx, l.svcCtx, p.UserID, growth.KindLikeReceived) // 被赞加经验(需求 3.1)
 	}
 	if added {
 		l.taskProgress(ctx, uid, "like")
+		l.svcCtx.PostModel.BumpHotScore(ctx, postID, hotLike)
 	}
 	return nil
 }
@@ -739,6 +741,7 @@ func (l *Logic) Unlike(ctx context.Context, uid, postID int64) error {
 	if err := l.svcCtx.InteractModel.Unlike(ctx, uid, model.LikeTargetPost, postID); err != nil {
 		return fmt.Errorf("post unlike: %w", err)
 	}
+	l.svcCtx.PostModel.BumpHotScore(ctx, postID, -hotLike)
 	return nil
 }
 
@@ -759,6 +762,9 @@ func (l *Logic) Favorite(ctx context.Context, uid, postID int64) error {
 			Content: "收藏了你的帖子 " + postBrief(p),
 		})
 	}
+	if added {
+		l.svcCtx.PostModel.BumpHotScore(ctx, postID, hotFavorite)
+	}
 	return nil
 }
 
@@ -766,6 +772,7 @@ func (l *Logic) Unfavorite(ctx context.Context, uid, postID int64) error {
 	if err := l.svcCtx.InteractModel.Unfavorite(ctx, uid, postID); err != nil {
 		return fmt.Errorf("post unfavorite: %w", err)
 	}
+	l.svcCtx.PostModel.BumpHotScore(ctx, postID, -hotFavorite)
 	return nil
 }
 

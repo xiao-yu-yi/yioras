@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/yiora/server/internal/logic/growth"
 	"github.com/yiora/server/internal/logic/postlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/xerr"
@@ -174,8 +175,9 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreateCommentR
 		if err := l.svcCtx.TaskModel.IncrProgress(ctx, uid, "comment", time.Now()); err != nil {
 			logx.WithContext(ctx).Errorf("task progress comment: %v", err)
 		}
-		if err := l.svcCtx.UserModel.AddExp(ctx, uid, 2); err != nil {
-			logx.WithContext(ctx).Errorf("comment exp: %v", err)
+		growth.Grant(ctx, l.svcCtx, uid, growth.KindComment)
+		if bizType == model.CommentBizPost {
+			l.svcCtx.PostModel.BumpHotScore(ctx, bizID, 15) // 评论计热度(权重与重算公式一致)
 		}
 	}
 	return &types.CreateCommentResp{CommentID: id, Status: status, Tip: tip}, nil

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -373,6 +374,49 @@ func (m *PostModel) Takedown(ctx context.Context, circleID, postID int64) (autho
 		return nil
 	})
 	return authorID, hit, err
+}
+
+// BumpHotScore 互动实时热度增量(赞/评/收藏/浏览即时反馈);
+// 真值由 RecalcHotScores 周期公式重算兜底,两次重算间的增量只是近似,允许误差。
+func (m *PostModel) BumpHotScore(ctx context.Context, postID, delta int64) {
+	if delta == 0 {
+		return
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `post` SET hot_score = GREATEST(hot_score + ?, 0) WHERE id = ?", delta, postID); err != nil {
+		logx.Errorf("bump hot score post=%d: %v", postID, err)
+	}
+}
+
+// RecalcHotScores 热度分周期重算(需求 3.2:时间衰减+互动热度+运营加权):
+//   - 近 7 天已发布帖:加权互动分 / (帖龄小时+2)^1.5,加精帖(运营加权)+5000;
+//   - 超 7 天:每轮 ×0.9 渐进冷却(免全表函数计算);
+//   - 圈子/软件:成员/发帖/下载/评论的线性聚合(展示排序足够)。
+//
+// 幂等:全部由计数列导出,重复执行结果一致。
+func (m *PostModel) RecalcHotScores(ctx context.Context) error {
+	if _, err := m.conn.ExecCtx(ctx, `
+		UPDATE post SET hot_score = FLOOR(
+			(like_count*10 + comment_count*15 + favorite_count*12 + view_count) * 1000
+			/ POW(TIMESTAMPDIFF(HOUR, created_at, NOW()) + 2, 1.5)
+		) + is_essence*5000
+		WHERE status = ? AND created_at > NOW() - INTERVAL 7 DAY`, PostStatusPublished); err != nil {
+		return fmt.Errorf("recalc hot posts: %w", err)
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE post SET hot_score = FLOOR(hot_score * 0.9) WHERE created_at <= NOW() - INTERVAL 7 DAY AND hot_score > 0"); err != nil {
+		return fmt.Errorf("decay old posts: %w", err)
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE circle SET hot_score = member_count*2 + post_count*5 WHERE status = 1"); err != nil {
+		return fmt.Errorf("recalc hot circles: %w", err)
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE software SET hot_score = download_count*3 + comment_count*10 WHERE status = 1"); err != nil {
+		return fmt.Errorf("recalc hot software: %w", err)
+	}
+	// 话题热度保留运营手动调整(后台话题管理),不参与自动重算
+	return nil
 }
 
 // MachineReject 机审高置信违规自动驳回(仅动待审/已发布帖,人工可在后台翻案恢复)。

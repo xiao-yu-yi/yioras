@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/yiora/server/internal/logic/growth"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -90,10 +91,8 @@ func (l *Logic) SignIn(ctx context.Context, uid int64) (*types.SignInResp, error
 		fmt.Sprintf("sign:%d:%s", uid, today), reward, "每日签到"); err != nil {
 		return nil, fmt.Errorf("sign credit: %w", err)
 	}
-	// 签到经验(固定 +5,等级成长)
-	if err := l.svcCtx.UserModel.AddExp(ctx, uid, 5); err != nil {
-		logx.WithContext(ctx).Errorf("sign exp: %v", err)
-	}
+	// 签到经验(权重后台可配 exp.sign,受每日上限约束)
+	growth.Grant(ctx, l.svcCtx, uid, growth.KindSign)
 	balance, err := l.svcCtx.YouzhuModel.Balance(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("balance: %w", err)
@@ -145,6 +144,7 @@ func (l *Logic) Claim(ctx context.Context, uid, taskID int64) (*types.ClaimResp,
 		return nil, xerr.New(xerr.CodeTooFrequent, "奖励已领取")
 	}
 	if task.RewardExp > 0 {
+		// 任务经验按任务配置数值发放,不占行为经验日上限(任务本身有每日完成次数约束)
 		if err := l.svcCtx.UserModel.AddExp(ctx, uid, task.RewardExp); err != nil {
 			logx.WithContext(ctx).Errorf("task %d exp: %v", taskID, err)
 		}

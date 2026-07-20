@@ -174,6 +174,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/users/:id/title", Handler: adminUserTitleHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/levels", Handler: adminLevelRulesHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/levels", Handler: adminSaveLevelRulesHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/configs", Handler: adminConfigsHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/configs", Handler: adminSaveConfigsHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/software", Handler: adminSoftwaresHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/software/:id/ops", Handler: adminSoftwareOpsHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/software/:id/versions", Handler: adminSoftwareVersionsHandler(svcCtx)},

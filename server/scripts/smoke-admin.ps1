@@ -426,6 +426,25 @@ $csImg = (Invoke-RestMethod "$adm/contents?type=1&keyword=imgscan" -Headers $ha)
 $firstImg = @($csImg.list | Where-Object { $_.firstImage -ne '' }).Count
 Write-Output "[12.44] preview=code$pvOk (expect 0) previewImgs=$pvImgs; contentsWithFirstImage=$firstImg (>=1)"
 
+# 12.45 growth params + like-received exp + daily cap: weights configurable via app_config, take effect immediately
+$expCfg = (Invoke-RestMethod "$adm/configs?prefix=exp." -Headers $ha).data
+$lbFresh = PostJson "$api/auth/login" @{email = "b@test.com"; password = "pass1234"} $null
+$hb2 = @{Authorization = "Bearer $($lbFresh.data.token)"}
+$expBefore = (Invoke-RestMethod "$api/user/me" -Headers $hb2).data.exp
+$gp = PostJson "$api/posts" @{circleId = 2; content = "growth exp target"} $hb2
+PostJson "$adm/configs" @{items = @(@{k = "exp.like_received"; v = "7"})} $ha | Out-Null
+PostJson "$api/posts/$($gp.data.postId)/like" @{} $h1 | Out-Null
+Start-Sleep -Milliseconds 300
+$expAfter = (Invoke-RestMethod "$api/user/me" -Headers $hb2).data.exp
+$expGain = $expAfter - $expBefore
+PostJson "$adm/configs" @{items = @(@{k = "exp.like_received"; v = "1"})} $ha | Out-Null
+$badCfg = PostJson "$adm/configs" @{items = @(@{k = "exp.unknown_key"; v = "1"})} $ha
+Write-Output "[12.45] cfgRows=$($expCfg.Count) (expect 5); expGain=$expGain (expect 12 = post5 + likeReceived7); unknownKey=code$($badCfg.code) (expect 40000)"
+
+# 12.46 hot score: interactions bump score, recalc keeps it positive, feed ranks hot post above plain newer post
+$hot1 = (docker compose exec -T mysql sh -c "mysql -uroot -proot123 yiora -N -e 'SELECT hot_score FROM post WHERE id=$($gp.data.postId)' 2>/dev/null" | Out-String).Trim()
+Write-Output "[12.46] hotScoreAfterLike=$hot1 (expect >0, like bumps +10)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

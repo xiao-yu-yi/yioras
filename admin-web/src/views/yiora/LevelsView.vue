@@ -1,4 +1,21 @@
 <template>
+  <!-- 成长参数:行为经验权重与每日上限(app_config,保存即生效) -->
+  <el-card class="growth-card" v-loading="cfgLoading">
+    <template #header>
+      <div class="bar">
+        <span>成长参数(行为经验权重,保存即生效)</span>
+        <el-button type="primary" :loading="cfgSaving" @click="saveCfg">保存参数</el-button>
+      </div>
+    </template>
+    <div class="cfg-grid">
+      <div v-for="c in cfgs" :key="c.k" class="cfg-item">
+        <div class="cfg-label">{{ c.remark }}</div>
+        <el-input-number v-model="c.num" :min="0" :max="99999" controls-position="right" />
+        <div class="cfg-key">{{ c.k }}</div>
+      </div>
+    </div>
+  </el-card>
+
   <el-card v-loading="loading">
     <template #header>
       <div class="bar">
@@ -69,6 +86,36 @@ const rules = ref<LevelRuleItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 
+interface CfgRow {
+  k: string
+  remark: string
+  num: number
+}
+const cfgs = ref<CfgRow[]>([])
+const cfgLoading = ref(false)
+const cfgSaving = ref(false)
+
+async function loadCfg() {
+  cfgLoading.value = true
+  try {
+    const rows = await api.appConfigs('exp.')
+    cfgs.value = rows.map((r) => ({ k: r.k, remark: r.remark, num: Number(r.v) || 0 }))
+  } finally {
+    cfgLoading.value = false
+  }
+}
+
+async function saveCfg() {
+  cfgSaving.value = true
+  try {
+    await api.saveAppConfigs(cfgs.value.map((c) => ({ k: c.k, v: String(c.num) })))
+    ElMessage.success('已保存,即时生效')
+    loadCfg()
+  } finally {
+    cfgSaving.value = false
+  }
+}
+
 function rowError(row: LevelRuleItem, idx: number) {
   if (idx === 0) return row.needExp === 0 ? '' : 'Lv0 必须为 0'
   if (row.needExp <= rules.value[idx - 1].needExp) return '需大于上一级'
@@ -112,7 +159,10 @@ async function save() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadCfg()
+})
 </script>
 
 <style scoped>
@@ -129,5 +179,27 @@ onMounted(load)
 }
 .sub {
   color: var(--el-text-color-secondary);
+}
+.growth-card {
+  margin-bottom: 16px;
+}
+.cfg-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+}
+.cfg-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cfg-label {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+.cfg-key {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  font-family: monospace;
 }
 </style>

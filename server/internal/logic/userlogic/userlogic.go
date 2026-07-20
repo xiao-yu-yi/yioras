@@ -32,6 +32,10 @@ func (l *Logic) Me(ctx context.Context, uid int64) (*types.UserInfoResp, error) 
 	if err != nil {
 		return nil, err
 	}
+	next, err := l.svcCtx.UserModel.NextLevelNeed(ctx, u.Level)
+	if err != nil {
+		logx.WithContext(ctx).Errorf("next level need: %v", err)
+	}
 	return &types.UserInfoResp{
 		UserID:    u.ID,
 		DisplayNo: u.DisplayNo.String,
@@ -40,6 +44,7 @@ func (l *Logic) Me(ctx context.Context, uid int64) (*types.UserInfoResp, error) 
 		Cover:     u.Cover,
 		Signature: u.Signature,
 		Level:     u.Level,
+		Exp:       u.Exp, NextLevelExp: next,
 	}, nil
 }
 

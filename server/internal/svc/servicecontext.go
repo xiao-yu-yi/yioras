@@ -37,6 +37,7 @@ type ServiceContext struct {
 
 	UserModel      *model.UserModel
 	PushModel      *model.PushModel
+	ConfigModel    *model.ConfigModel
 	CircleModel    *model.CircleModel
 	PostModel      *model.PostModel
 	InteractModel  *model.InteractModel
@@ -176,6 +177,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 		UserModel:      userModel,
 		PushModel:      pushModel,
+		ConfigModel:    model.NewConfigModel(conn),
 		CircleModel:    model.NewCircleModel(conn),
 		PostModel:      model.NewPostModel(conn),
 		InteractModel:  model.NewInteractModel(conn),

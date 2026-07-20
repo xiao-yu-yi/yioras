@@ -326,6 +326,11 @@ export const api = {
   levelRules: () => http.get('/levels') as Promise<LevelRuleItem[]>,
   saveLevelRules: (rules: LevelRuleItem[]) => http.post('/levels', { rules }),
 
+  // 运营参数(成长权重等)
+  appConfigs: (prefix: string) =>
+    http.get('/configs', { params: { prefix } }) as Promise<{ k: string; v: string; remark: string; updatedAt: number }[]>,
+  saveAppConfigs: (items: { k: string; v: string }[]) => http.post('/configs', { items }),
+
   // 审核内容回查(原文+图片)
   auditPreview: (id: number) =>
     http.get(`/audits/${id}/preview`) as Promise<{
