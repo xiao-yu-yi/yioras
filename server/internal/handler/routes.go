@@ -111,6 +111,10 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodGet, Path: "/notifications/unread", Handler: unreadHandler(svcCtx)},
 
 		{Method: http.MethodPost, Path: "/upload/presign", Handler: presignHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/upload/multipart/init", Handler: multipartInitHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/upload/multipart/complete", Handler: multipartCompleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/upload/multipart/abort", Handler: multipartAbortHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/upload/multipart/parts", Handler: multipartPartsHandler(svcCtx)},
 
 		{Method: http.MethodGet, Path: "/tasks", Handler: taskListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/tasks/sign-in", Handler: signInHandler(svcCtx)},

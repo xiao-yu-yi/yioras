@@ -22,11 +22,32 @@
       <el-table-column prop="bizId" label="业务ID" width="100" />
       <el-table-column label="机审" width="100">
         <template #default="{ row }">
-          <el-tag v-if="row.machineResult === 2" type="warning">疑似</el-tag>
+          <el-tag v-if="row.machineResult === 3" type="danger">已拦截</el-tag>
+          <el-tag v-else-if="row.machineResult === 2" type="warning">疑似</el-tag>
           <el-tag v-else type="info">常规</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="machineDetail" label="机审明细" show-overflow-tooltip />
+      <el-table-column label="机审明细" min-width="240">
+        <template #default="{ row }">
+          <!-- 图片机审结构化明细:命中图缩略 + 标签/分值;其余保持原文 -->
+          <template v-if="imgDetail(row)">
+            <div class="img-detail">
+              <el-image
+                :src="imgDetail(row)!.img"
+                :preview-src-list="[imgDetail(row)!.img]"
+                preview-teleported
+                fit="cover"
+                class="hit-img"
+              />
+              <div class="img-meta">
+                <el-tag size="small" type="danger">{{ imgDetail(row)!.label }}</el-tag>
+                <span class="score">置信 {{ (imgDetail(row)!.score * 100).toFixed(0) }}%</span>
+              </div>
+            </div>
+          </template>
+          <span v-else class="plain-detail">{{ row.machineDetail }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="提交时间" width="170">
         <template #default="{ row }">{{ fmtTime(row.createdAt) }}</template>
       </el-table-column>
@@ -58,6 +79,25 @@ const loading = ref(false)
 
 function bizName(t: number) {
   return { 1: '帖子', 2: '评论', 3: '软件' }[t] ?? '未知'
+}
+
+interface ImgScanDetail {
+  img: string
+  label: string
+  score: number
+  scanner?: string
+}
+
+// 图片机审明细(imgscan 写入的 JSON:{img,label,score,scanner})解析,非该结构返回 null 走原文展示
+function imgDetail(row: AuditItem): ImgScanDetail | null {
+  if (!row.machineDetail) return null
+  try {
+    const d = JSON.parse(row.machineDetail)
+    if (d && typeof d.img === 'string' && d.img && typeof d.label === 'string') {
+      return { img: d.img, label: d.label, score: Number(d.score) || 0, scanner: d.scanner }
+    }
+  } catch { /* 非 JSON 明细走原文 */ }
+  return null
 }
 function tagType(t: number) {
   return ({ 1: 'primary', 2: 'success', 3: 'warning' } as const)[t as 1 | 2 | 3] ?? 'info'
@@ -105,5 +145,28 @@ onMounted(() => load(1))
   gap: 12px;
   align-items: center;
   justify-content: flex-end;
+}
+.img-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hit-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex: none;
+}
+.img-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.score {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.plain-detail {
+  color: var(--el-text-color-regular);
 }
 </style>

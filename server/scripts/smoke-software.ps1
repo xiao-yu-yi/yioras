@@ -70,4 +70,42 @@ $dup = PostJson "$api/software/$sid/versions" @{version = "2.4.0"; size = "1MB";
 $forbid = PostJson "$api/software/$sid/versions" @{version = "9.9.9"; size = "1MB"; downloadUrl = "https://x.com/1"} $h2
 Write-Output "[9] dup=code$($dup.code) nonOwner=code$($forbid.code)"
 
+# 10. multipart apk upload: 3 parts (8+8+4MB) with mid-way resume, merge integrity, ownership guard, abort cleanup
+$partSize = 8MB
+$sizes = @($partSize, $partSize, 4MB)
+$total = ($sizes | Measure-Object -Sum).Sum
+$mp = PostJson "$api/upload/multipart/init" @{kind = "apk"; fileName = "big.apk"; size = $total} $h1
+if ($mp.code -ne 0) { throw "multipart init failed: $($mp.code)" }
+$rand = New-Object Random 42
+$srcFile = Join-Path ([IO.Path]::GetTempPath()) "smoke_mp_src.apk"
+$fs = [IO.File]::Create($srcFile)
+$chunks = @()
+foreach ($s in $sizes) { $b = New-Object byte[] $s; $rand.NextBytes($b); $fs.Write($b, 0, $b.Length); $chunks += , $b }
+$fs.Close()
+$etags = @{}
+# upload part 1 & 2 only, then simulate app restart: query parts and finish the gap
+for ($i = 0; $i -lt 2; $i++) {
+    $u = ($mp.data.urls | Where-Object { $_.partNumber -eq ($i + 1) }).url
+    $r = Invoke-WebRequest -Method Put -Uri $u -Body $chunks[$i] -UseBasicParsing
+    $etags[$i + 1] = [string]$r.Headers['ETag']
+}
+$resume = (Invoke-RestMethod "$api/upload/multipart/parts?uploadId=$($mp.data.uploadId)&key=$($mp.data.key)" -Headers $h1).data
+$doneCnt = @($resume.parts).Count
+$gapCnt = @($resume.urls).Count
+$r3 = Invoke-WebRequest -Method Put -Uri $resume.urls[0].url -Body $chunks[2] -UseBasicParsing
+$etags[3] = [string]$r3.Headers['ETag']
+# ownership guard: another user cannot complete/list this upload
+$steal = PostJson "$api/upload/multipart/complete" @{uploadId = $mp.data.uploadId; key = $mp.data.key; parts = @(@{partNumber = 1; etag = $etags[1]})} $h2
+$plist = @(1, 2, 3 | ForEach-Object { @{partNumber = $_; etag = $etags[$_]} })
+$fin = PostJson "$api/upload/multipart/complete" @{uploadId = $mp.data.uploadId; key = $mp.data.key; parts = $plist} $h1
+$dlFile = Join-Path ([IO.Path]::GetTempPath()) "smoke_mp_dl.apk"
+Invoke-WebRequest -Uri $fin.data.fileUrl -OutFile $dlFile -UseBasicParsing
+$hashSame = (Get-FileHash $srcFile -Algorithm SHA256).Hash -eq (Get-FileHash $dlFile -Algorithm SHA256).Hash
+Remove-Item $srcFile, $dlFile -ErrorAction SilentlyContinue
+# abort flow: ticket revoked afterwards
+$mp2 = PostJson "$api/upload/multipart/init" @{kind = "apk"; fileName = "drop.apk"; size = 9MB} $h1
+$ab = PostJson "$api/upload/multipart/abort" @{uploadId = $mp2.data.uploadId; key = $mp2.data.key} $h1
+$gone = (Invoke-RestMethod "$api/upload/multipart/parts?uploadId=$($mp2.data.uploadId)&key=$($mp2.data.key)" -Headers $h1).code
+Write-Output "[10] mpInit parts=$($mp.data.urls.Count) (expect 3); resume done=$doneCnt gap=$gapCnt (expect 2/1); steal=code$($steal.code) (expect 40300); merge=code$($fin.code) hashSame=$hashSame (expect True); abort=code$($ab.code) ticketGone=code$gone (expect 40400)"
+
 Write-Output "SOFT_SMOKE_DONE"

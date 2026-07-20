@@ -6,6 +6,7 @@ import (
 	"github.com/yiora/server/internal/pkg/emailx"
 	"github.com/yiora/server/internal/pkg/imgscan"
 	"github.com/yiora/server/internal/pkg/ipallow"
+	"github.com/yiora/server/internal/pkg/multipart"
 	"github.com/yiora/server/internal/pkg/search"
 	"github.com/yiora/server/internal/pkg/sensitive"
 	"github.com/yiora/server/internal/pkg/wspush"
@@ -24,6 +25,7 @@ type ServiceContext struct {
 	Search search.Searcher   // 全站搜索,当前 MySQL LIKE,可换 Meilisearch
 	AdminIPs *ipallow.List   // 后台访问 IP 白名单(启动时解析)
 	ImgScanner imgscan.Scanner // 图片机审驱动,nil=关闭(直传后异步送审)
+	Multipart *multipart.Client // S3 分片上传(APK 大文件),nil=对象存储未配置
 
 	UserModel      *model.UserModel
 	CircleModel    *model.CircleModel
@@ -59,11 +61,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		logx.Must(err) // provider 写错宁可起不来,不能静默关闭机审
 	}
+	var mpClient *multipart.Client
+	if c.Storage.Endpoint != "" && c.Storage.Bucket != "" {
+		mpClient, err = multipart.New(multipart.Config{
+			Endpoint: c.Storage.Endpoint, PublicBaseURL: c.Storage.PublicBaseURL,
+			Region: c.Storage.Region, Bucket: c.Storage.Bucket,
+			AccessKey: c.Storage.AccessKey, SecretKey: c.Storage.SecretKey,
+		})
+		if err != nil {
+			logx.Must(err)
+		}
+	}
 	return &ServiceContext{
 		Config: c,
 		Redis:  redis.MustNewRedis(c.Redis),
 		AdminIPs: adminIPs,
 		ImgScanner: scanner,
+		Multipart: mpClient,
 		Email: emailx.NewSender(emailx.Config{
 			Host: c.Email.Host, Port: c.Email.Port,
 			Username: c.Email.Username, Password: c.Email.Password,

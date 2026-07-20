@@ -47,6 +47,57 @@ type UpdateSettingsReq struct {
 	TeenMode *bool `json:"teenMode,optional"` // 缺省不变
 }
 
+// ---- 大文件分片上传(APK) ----
+
+type MultipartInitReq struct {
+	Kind     string `json:"kind,options=apk"` // 当前仅 APK,视频二期扩展
+	FileName string `json:"fileName"`
+	Size     int64  `json:"size"`
+}
+
+type MultipartPartURL struct {
+	PartNumber int    `json:"partNumber"`
+	URL        string `json:"url"`
+}
+
+type MultipartInitResp struct {
+	UploadID string             `json:"uploadId"`
+	Key      string             `json:"key"`
+	PartSize int64              `json:"partSize"`
+	URLs     []MultipartPartURL `json:"urls"`
+	ExpireAt int64              `json:"expireAt"` // 分片 URL 过期时间(毫秒),过期用 parts 接口补签
+}
+
+type MultipartPartETag struct {
+	PartNumber int    `json:"partNumber"`
+	ETag       string `json:"etag"`
+}
+
+type MultipartCompleteReq struct {
+	UploadID string              `json:"uploadId"`
+	Key      string              `json:"key"`
+	Parts    []MultipartPartETag `json:"parts"`
+}
+
+type MultipartCompleteResp struct {
+	FileURL string `json:"fileUrl"`
+}
+
+type MultipartAbortReq struct {
+	UploadID string `json:"uploadId"`
+	Key      string `json:"key"`
+}
+
+type MultipartPartsReq struct {
+	UploadID string `form:"uploadId"`
+	Key      string `form:"key"`
+}
+
+type MultipartPartsResp struct {
+	Parts []MultipartPartETag `json:"parts"`
+	URLs  []MultipartPartURL  `json:"urls"` // 未完成分片的新签 URL(续传直接用)
+}
+
 // ---- 帖子分享口令 ----
 
 type SharePostResp struct {

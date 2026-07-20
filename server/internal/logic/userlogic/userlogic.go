@@ -12,6 +12,7 @@ import (
 	"github.com/yiora/server/internal/logic/postlogic"
 	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/model"
+	"github.com/yiora/server/internal/pkg/imgscan"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
 	"github.com/yiora/server/internal/types"
@@ -79,11 +80,17 @@ func (l *Logic) UpdateMe(ctx context.Context, uid int64, req *types.UpdateProfil
 		if !uploadlogic.AllowedImageURL(l.svcCtx.Config, *req.Avatar) {
 			return xerr.Param("头像链接不合法,请通过上传接口获取")
 		}
+		if err := l.scanProfileImage(ctx, *req.Avatar, "头像"); err != nil {
+			return err
+		}
 		fields["avatar"] = *req.Avatar
 	}
 	if req.Cover != nil {
 		if !uploadlogic.AllowedImageURL(l.svcCtx.Config, *req.Cover) {
 			return xerr.Param("封面链接不合法,请通过上传接口获取")
+		}
+		if err := l.scanProfileImage(ctx, *req.Cover, "封面"); err != nil {
+			return err
 		}
 		fields["cover"] = *req.Cover
 	}
@@ -105,6 +112,24 @@ func (l *Logic) UpdateMe(ctx context.Context, uid int64, req *types.UpdateProfil
 	}
 	if err := l.svcCtx.UserModel.UpdateProfile(ctx, uid, fields); err != nil {
 		return fmt.Errorf("update profile: %w", err)
+	}
+	return nil
+}
+
+// scanProfileImage 头像/封面属高曝光位,保存前同步机审:高置信违规直接拒绝。
+// 疑似(review)放行不入队(audit_queue 无用户资料类目,低置信不阻塞体验);
+// 机审关闭或云端异常按放行降级,不阻断资料编辑。
+func (l *Logic) scanProfileImage(ctx context.Context, imageURL, what string) error {
+	if l.svcCtx.ImgScanner == nil {
+		return nil
+	}
+	r, err := l.svcCtx.ImgScanner.Scan(ctx, imageURL)
+	if err != nil {
+		logx.WithContext(ctx).Errorf("imgscan %s %s: %v", what, imageURL, err)
+		return nil
+	}
+	if r.Verdict == imgscan.VerdictBlock {
+		return xerr.New(xerr.CodeContentBlocked, what+"图片涉嫌违规,请更换后重试")
 	}
 	return nil
 }
