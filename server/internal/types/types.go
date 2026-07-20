@@ -130,6 +130,17 @@ type BotStatsResp struct {
 	Days []BotStatDay `json:"days"`
 }
 
+// ---- 等级规则管理 ----
+
+type LevelRuleItem struct {
+	Level   int64 `json:"level"`
+	NeedExp int64 `json:"needExp"`
+}
+
+type AdminLevelRulesSaveReq struct {
+	Rules []LevelRuleItem `json:"rules"`
+}
+
 // ---- 推送渠道看板 ----
 
 type PushStatsReq struct {

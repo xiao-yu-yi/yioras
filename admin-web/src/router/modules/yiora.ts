@@ -55,6 +55,12 @@ export default [
         name: "Users",
         component: () => import("@/views/yiora/UsersView.vue"),
         meta: { title: "用户管理", icon: "ep/user" }
+      },
+      {
+        path: "/levels",
+        name: "Levels",
+        component: () => import("@/views/yiora/LevelsView.vue"),
+        meta: { title: "等级规则", icon: "ep/histogram" }
       }
     ]
   },

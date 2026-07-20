@@ -752,6 +752,51 @@ func (l *Logic) PublishNotice(ctx context.Context, adminID int64, req *types.Adm
 // agreementKinds 协议/静态文案合法类型;bot_prompt 为管家 LLM 系统提示词(仅后台可读写,用户侧接口拒绝)。
 var agreementKinds = map[string]bool{"user": true, "privacy": true, "bot_prompt": true}
 
+// LevelRules 等级经验阈值表。
+func (l *Logic) LevelRules(ctx context.Context) ([]types.LevelRuleItem, error) {
+	rows, err := l.svcCtx.AdminModel.ListLevelRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]types.LevelRuleItem, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, types.LevelRuleItem{Level: r.Level, NeedExp: r.NeedExp})
+	}
+	return out, nil
+}
+
+// SaveLevelRules 整表保存:等级 0..N 连续、经验严格递增、Lv0 必为 0(注册即 Lv0)。
+// 升级计算实时读表,保存即对后续加经验生效;存量用户等级不回算(经验不变,下次加经验时重算)。
+func (l *Logic) SaveLevelRules(ctx context.Context, adminID int64, req *types.AdminLevelRulesSaveReq, ip string) error {
+	rules := req.Rules
+	if len(rules) < 2 || len(rules) > 51 {
+		return xerr.Param("等级数需在 2-51 档之间(含 Lv0)")
+	}
+	for i, r := range rules {
+		if r.Level != int64(i) {
+			return xerr.Param(fmt.Sprintf("等级必须从 0 连续递增,第 %d 行应为 Lv%d", i+1, i))
+		}
+		if i == 0 {
+			if r.NeedExp != 0 {
+				return xerr.Param("Lv0 所需经验必须为 0")
+			}
+			continue
+		}
+		if r.NeedExp <= rules[i-1].NeedExp {
+			return xerr.Param(fmt.Sprintf("Lv%d 所需经验必须大于 Lv%d", r.Level, rules[i-1].Level))
+		}
+	}
+	rows := make([]model.LevelRuleRow, 0, len(rules))
+	for _, r := range rules {
+		rows = append(rows, model.LevelRuleRow{Level: r.Level, NeedExp: r.NeedExp})
+	}
+	if err := l.svcCtx.AdminModel.SaveLevelRules(ctx, rows); err != nil {
+		return err
+	}
+	l.opLog(ctx, adminID, "user.level.rules", fmt.Sprintf("levels:%d maxExp:%d", len(rules), rules[len(rules)-1].NeedExp), "", ip)
+	return nil
+}
+
 // PushStats 推送渠道看板:各渠道发送/失败日计数(apppush.Manager 写入)。
 func (l *Logic) PushStats(ctx context.Context, days int) (*types.PushStatsResp, error) {
 	out := &types.PushStatsResp{Channels: []types.PushChannelStat{}}

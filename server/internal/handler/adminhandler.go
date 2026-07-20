@@ -934,6 +934,32 @@ func adminSaveAgreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminLevelRulesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		out, err := adminlogic.New(svcCtx).LevelRules(r.Context())
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminSaveLevelRulesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.AdminLevelRulesSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).SaveLevelRules(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
 func adminUserLevelHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "user.ban", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
 		var req types.AdminUserLevelReq

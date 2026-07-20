@@ -1398,6 +1398,39 @@ func (m *AdminModel) SaveAgreement(ctx context.Context, kind, title, content str
 	return nil
 }
 
+// LevelRuleRow 等级经验阈值行。
+type LevelRuleRow struct {
+	Level   int64 `db:"level"`
+	NeedExp int64 `db:"need_exp"`
+}
+
+// ListLevelRules 全量阈值表(升序)。
+func (m *AdminModel) ListLevelRules(ctx context.Context) ([]LevelRuleRow, error) {
+	var rows []LevelRuleRow
+	err := m.conn.QueryRowsCtx(ctx, &rows,
+		"SELECT level, need_exp FROM `level_rule` ORDER BY level")
+	if err != nil {
+		return nil, fmt.Errorf("list level rules: %w", err)
+	}
+	return rows, nil
+}
+
+// SaveLevelRules 整表替换(事务;合法性由 logic 校验,升级计算实时读表即时生效)。
+func (m *AdminModel) SaveLevelRules(ctx context.Context, rules []LevelRuleRow) error {
+	return m.conn.TransactCtx(ctx, func(ctx context.Context, s sqlx.Session) error {
+		if _, err := s.ExecCtx(ctx, "DELETE FROM `level_rule`"); err != nil {
+			return fmt.Errorf("clear level rules: %w", err)
+		}
+		for _, r := range rules {
+			if _, err := s.ExecCtx(ctx,
+				"INSERT INTO `level_rule` (level, need_exp) VALUES (?, ?)", r.Level, r.NeedExp); err != nil {
+				return fmt.Errorf("insert level rule %d: %w", r.Level, err)
+			}
+		}
+		return nil
+	})
+}
+
 // SetUserLevel 后台调整等级/经验(<0 不变)。
 func (m *AdminModel) SetUserLevel(ctx context.Context, uid, level, exp int64) (bool, error) {
 	sets, args := []string{}, []any{}

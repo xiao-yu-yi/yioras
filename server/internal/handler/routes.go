@@ -171,6 +171,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/users/:id/ban", Handler: adminBanHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/users/:id/level", Handler: adminUserLevelHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/users/:id/title", Handler: adminUserTitleHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/levels", Handler: adminLevelRulesHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/levels", Handler: adminSaveLevelRulesHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/agreements/:kind", Handler: adminAgreementHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/agreements/:kind", Handler: adminSaveAgreementHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/banners", Handler: adminBannersHandler(svcCtx)},

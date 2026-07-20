@@ -321,6 +321,10 @@ export const api = {
   botStats: (days = 7) =>
     http.get('/bot/stats', { params: { days } }) as Promise<{ days: { date: string; faq: number; llm: number; fallback: number }[] }>,
 
+  // 等级规则
+  levelRules: () => http.get('/levels') as Promise<LevelRuleItem[]>,
+  saveLevelRules: (rules: LevelRuleItem[]) => http.post('/levels', { rules }),
+
   // 推送渠道看板
   pushStats: (days = 7) =>
     http.get('/push/stats', { params: { days } }) as Promise<{
@@ -362,6 +366,11 @@ export interface AdminYouzhuLogItem {
   balanceAfter: number
   remark: string
   createdAt: number
+}
+
+export interface LevelRuleItem {
+  level: number
+  needExp: number
 }
 
 export interface AdminPrettyNoItem {

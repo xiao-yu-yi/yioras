@@ -387,6 +387,16 @@ $pstats = (Invoke-RestMethod "$adm/push/stats?days=7" -Headers $ha).data
 $mockCh = @($pstats.channels | Where-Object { $_.channel -eq 'mock' })[0]
 Write-Output "[12.40] pushStats channels=$($pstats.channels.Count) mockOk=$($mockCh.ok) (expect >=2) mockFail=$($mockCh.fail) (expect 0)"
 
+# 12.41 level rule table: read 11 seeded rows, bad save rejected, valid save applied then restored
+$lv = (Invoke-RestMethod "$adm/levels" -Headers $ha).data
+$lvBadRules = @($lv | ForEach-Object { @{level = $_.level; needExp = $_.needExp} }); $lvBadRules[2].needExp = 1
+$lvBad = PostJson "$adm/levels" @{rules = $lvBadRules} $ha
+$lvNewRules = @($lv | ForEach-Object { @{level = $_.level; needExp = $_.needExp} }) + , @{level = $lv.Count; needExp = ($lv[-1].needExp + 1000)}
+$lvSave = PostJson "$adm/levels" @{rules = $lvNewRules} $ha
+$lvAfter = (Invoke-RestMethod "$adm/levels" -Headers $ha).data
+PostJson "$adm/levels" @{rules = @($lv | ForEach-Object { @{level = $_.level; needExp = $_.needExp} })} $ha | Out-Null
+Write-Output "[12.41] levels=$($lv.Count) (expect 11) badSave=code$($lvBad.code) (expect 40000) addLevel=code$($lvSave.code) after=$($lvAfter.Count) (expect 12)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null
