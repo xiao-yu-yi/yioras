@@ -220,6 +220,9 @@ curl -X POST localhost:8888/api/v1/upload/presign -H "Authorization: Bearer $T" 
 # 外链一律 40000(未配置 Storage 的部署退化为 http(s) 前缀检查);下载地址(网盘外链)不受限
 # 管理端同能力:POST /admin/v1/upload/presign(kind 另有 banner/deco)
 
+# 演示态一键重置(admin 回 admin123+强制改密,TOTP/锁定/票据全清,业务数据不动):
+#   powershell -File .\scripts\demo-reset.ps1
+
 ## 回归冒烟基线(发版前必跑)
 
 ```powershell
