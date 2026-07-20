@@ -10,6 +10,7 @@ import (
 
 	"github.com/yiora/server/internal/logic/draftlogic"
 	"github.com/yiora/server/internal/logic/postlogic"
+	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -50,14 +51,14 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreateSoftware
 	if utf8.RuneCountInString(intro) > maxIntroRunes {
 		return nil, xerr.Param(fmt.Sprintf("软件简介最多 %d 字", maxIntroRunes))
 	}
-	if err := checkURL(req.Logo, "Logo"); err != nil {
+	if err := l.checkImageURL(req.Logo, "Logo"); err != nil {
 		return nil, err
 	}
 	if len(req.Images) < minIntroImages || len(req.Images) > maxIntroImages {
 		return nil, xerr.Param(fmt.Sprintf("介绍图需为 %d-%d 张", minIntroImages, maxIntroImages))
 	}
 	for _, img := range req.Images {
-		if err := checkURL(img, "介绍图"); err != nil {
+		if err := l.checkImageURL(img, "介绍图"); err != nil {
 			return nil, err
 		}
 	}
@@ -371,9 +372,18 @@ func toItem(s *model.Software) types.SoftwareItem {
 	}
 }
 
+// checkURL 外部链接宽校验(下载地址是站外网盘,只查协议)。
 func checkURL(u, field string) error {
 	if len(u) > 500 || (!strings.HasPrefix(u, "https://") && !strings.HasPrefix(u, "http://")) {
 		return xerr.Param(field + "链接格式不正确")
+	}
+	return nil
+}
+
+// checkImageURL 图片走我方存储域名白名单(logo/介绍图必须直传)。
+func (l *Logic) checkImageURL(u, field string) error {
+	if !uploadlogic.AllowedImageURL(l.svcCtx.Config, u) {
+		return xerr.Param(field + "链接不合法,请通过上传接口获取")
 	}
 	return nil
 }

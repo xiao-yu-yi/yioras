@@ -28,12 +28,18 @@ $h2 = @{Authorization = "Bearer $($r2.data.token)"}
 $uidA = $r1.data.userId; $uidB = $r2.data.userId
 Write-Output "[1] register U1=$uidA/$($r1.data.displayNo) U2=$uidB/$($r2.data.displayNo)"
 
-# 2. 加圈 + 发帖 + 推荐流
+# 2. 加圈 + 发帖(帖图先直传对象存储,业务侧强制域名白名单) + 推荐流
 (PostJson "$api/circles/2/join" @{} $h1).code | Out-Null
-$post = PostJson "$api/posts" @{circleId = 2; title = "Yiora first"; content = "hello community"; images = @(@{url = "https://cdn.example.com/1.jpg"; width = 800; height = 600})} $h1
+$pre = PostJson "$api/upload/presign" @{kind = "post"; fileName = "1.png"; size = 256} $h1
+$tmpImg = Join-Path $env:TEMP "smoke_c_img.png"
+[IO.File]::WriteAllBytes($tmpImg, (New-Object byte[] 256))
+Invoke-WebRequest -Method Put -Uri $pre.data.uploadUrl -InFile $tmpImg -UseBasicParsing | Out-Null
+Remove-Item $tmpImg -ErrorAction SilentlyContinue
+$extImg = PostJson "$api/posts" @{circleId = 2; content = "ext img"; images = @(@{url = "https://evil.example.com/x.jpg"})} $h1
+$post = PostJson "$api/posts" @{circleId = 2; title = "Yiora first"; content = "hello community"; images = @(@{url = $pre.data.fileUrl; width = 800; height = 600})} $h1
 $postId = $post.data.postId
 $feed = (Invoke-RestMethod "$api/posts").data
-Write-Output "[2] post id=$postId status=$($post.data.status); feed count=$($feed.Count) author=$($feed[0].author.nickname)"
+Write-Output "[2] extImgReject=code$($extImg.code) (expect 40000) post id=$postId status=$($post.data.status); feed count=$($feed.Count) author=$($feed[0].author.nickname)"
 
 # 3. 互动:U2 赞/藏/评,U1 回复,楼中楼
 (PostJson "$api/posts/$postId/like" @{} $h2).code | Out-Null

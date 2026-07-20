@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/logic/userlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/captcha"
@@ -914,8 +915,11 @@ func (l *Logic) Banners(ctx context.Context) ([]types.AdminBannerItem, error) {
 
 // SaveBanner 新建/更新 Banner。
 func (l *Logic) SaveBanner(ctx context.Context, adminID int64, req *types.AdminBannerReq, ip string) (int64, error) {
-	if strings.TrimSpace(req.Title) == "" || !strings.HasPrefix(req.Image, "http") {
-		return 0, xerr.Param("标题与图片必填")
+	if strings.TrimSpace(req.Title) == "" {
+		return 0, xerr.Param("标题必填")
+	}
+	if !uploadlogic.AllowedImageURL(l.svcCtx.Config, req.Image) {
+		return 0, xerr.Param("Banner 图链接不合法,请通过上传获取")
 	}
 	b := &model.BannerFull{
 		ID: req.ID, Title: req.Title, Image: req.Image,
@@ -1090,8 +1094,11 @@ func (l *Logic) Decorations(ctx context.Context) ([]types.AdminDecoItem, error) 
 
 // SaveDecoration 新建/更新装扮商品。
 func (l *Logic) SaveDecoration(ctx context.Context, adminID int64, req *types.AdminDecoSaveReq, ip string) (int64, error) {
-	if strings.TrimSpace(req.Name) == "" || !strings.HasPrefix(req.Preview, "http") {
-		return 0, xerr.Param("名称与预览图必填")
+	if strings.TrimSpace(req.Name) == "" {
+		return 0, xerr.Param("名称必填")
+	}
+	if !uploadlogic.AllowedImageURL(l.svcCtx.Config, req.Preview) {
+		return 0, xerr.Param("预览图链接不合法,请通过上传获取")
 	}
 	if req.Price < 0 || req.DurationDays < 0 {
 		return 0, xerr.Param("价格与有效天数不能为负")

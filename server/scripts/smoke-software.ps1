@@ -18,12 +18,21 @@ $cats = (Invoke-RestMethod "$api/software/categories?type=1").data
 Write-Output ("[1] categories(type=1): " + (($cats | ForEach-Object { "$($_.id):$($_.name)" }) -join ' '))
 $catId = $cats[0].id
 
-# 2. image count violation (2 images) must be rejected
-$bad = PostJson "$api/software" @{name = "BadApp"; logo = "https://cdn.example.com/logo.png"; intro = "x"; images = @("https://a/1.jpg", "https://a/2.jpg"); type = 1; categoryId = $catId; version = "1.0"; size = "10MB"; downloadUrl = "https://pan.example.com/x"} $h1
-Write-Output "[2] 2-images reject: code=$($bad.code) msg=$($bad.msg)"
+# upload one real image via presign (logo/screenshots must come from our storage now)
+$preS = PostJson "$api/upload/presign" @{kind = "software"; fileName = "s.png"; size = 256} $h1
+$tmpS = Join-Path $env:TEMP "smoke_s_img.png"
+[IO.File]::WriteAllBytes($tmpS, (New-Object byte[] 256))
+Invoke-WebRequest -Method Put -Uri $preS.data.uploadUrl -InFile $tmpS -UseBasicParsing | Out-Null
+Remove-Item $tmpS -ErrorAction SilentlyContinue
+$img = $preS.data.fileUrl
+
+# 2. image count violation (2 images) must be rejected; external logo also rejected
+$bad = PostJson "$api/software" @{name = "BadApp"; logo = $img; intro = "x"; images = @($img, $img); type = 1; categoryId = $catId; version = "1.0"; size = "10MB"; downloadUrl = "https://pan.example.com/x"} $h1
+$extLogo = PostJson "$api/software" @{name = "ExtApp"; logo = "https://evil.example.com/l.png"; intro = "x"; images = @($img, $img, $img); type = 1; categoryId = $catId; version = "1.0"; size = "10MB"; downloadUrl = "https://pan.example.com/x"} $h1
+Write-Output "[2] 2-images reject: code=$($bad.code); extLogo reject: code=$($extLogo.code) (expect 40000x2)"
 
 # 3. normal publish (3 images + tags + extract code)
-$soft = PostJson "$api/software" @{name = "YioraToolbox"; logo = "https://cdn.example.com/logo.png"; intro = "all-in-one toolbox, clean and adfree"; images = @("https://cdn.example.com/s1.jpg", "https://cdn.example.com/s2.jpg", "https://cdn.example.com/s3.jpg"); type = 1; categoryId = $catId; tags = @("NoLogin", "AdFree"); version = "2.3.1"; size = "128MB"; channel = "custom"; downloadUrl = "https://pan.example.com/yiora"; extractCode = "y1r4"} $h1
+$soft = PostJson "$api/software" @{name = "YioraToolbox"; logo = $img; intro = "all-in-one toolbox, clean and adfree"; images = @($img, $img, $img); type = 1; categoryId = $catId; tags = @("NoLogin", "AdFree"); version = "2.3.1"; size = "128MB"; channel = "custom"; downloadUrl = "https://pan.example.com/yiora"; extractCode = "y1r4"} $h1
 $sid = $soft.data.softwareId; $vid = $soft.data.versionId
 Write-Output "[3] publish: code=$($soft.code) softwareId=$sid versionId=$vid status=$($soft.data.status)"
 

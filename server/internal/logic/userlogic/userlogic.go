@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/yiora/server/internal/logic/postlogic"
+	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -75,14 +76,14 @@ func (l *Logic) UpdateMe(ctx context.Context, uid int64, req *types.UpdateProfil
 		fields["signature"] = res.Text
 	}
 	if req.Avatar != nil {
-		if err := checkImageURL(*req.Avatar); err != nil {
-			return err
+		if !uploadlogic.AllowedImageURL(l.svcCtx.Config, *req.Avatar) {
+			return xerr.Param("头像链接不合法,请通过上传接口获取")
 		}
 		fields["avatar"] = *req.Avatar
 	}
 	if req.Cover != nil {
-		if err := checkImageURL(*req.Cover); err != nil {
-			return err
+		if !uploadlogic.AllowedImageURL(l.svcCtx.Config, *req.Cover) {
+			return xerr.Param("封面链接不合法,请通过上传接口获取")
 		}
 		fields["cover"] = *req.Cover
 	}
@@ -104,13 +105,6 @@ func (l *Logic) UpdateMe(ctx context.Context, uid int64, req *types.UpdateProfil
 	}
 	if err := l.svcCtx.UserModel.UpdateProfile(ctx, uid, fields); err != nil {
 		return fmt.Errorf("update profile: %w", err)
-	}
-	return nil
-}
-
-func checkImageURL(u string) error {
-	if len(u) > 255 || (!strings.HasPrefix(u, "https://") && !strings.HasPrefix(u, "http://")) {
-		return xerr.Param("图片链接格式不正确")
 	}
 	return nil
 }

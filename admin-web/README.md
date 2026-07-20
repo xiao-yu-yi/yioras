@@ -16,7 +16,7 @@ Vue 3 + TypeScript + Vite + Element Plus + Pinia。对接 `server` 的 `/admin/v
 | `/reports` | 举报处理 | `GET /admin/v1/reports`(状态/类型筛选+目标摘要) + `POST /admin/v1/reports/:id/handle`;弹窗内快捷下架内容/处置用户后结单 |
 | `/certs` | 认证审核 | `GET /admin/v1/certifications`、`POST /admin/v1/certifications/:id/decide` |
 | `/users` | 用户管理 | `GET /admin/v1/users`(昵称/编号/邮箱搜索+状态筛选+分页) + `POST /admin/v1/users/:id/ban`(禁言/封禁/恢复,二次确认) |
-| `/banners` | Banner 配置 | `GET/POST/DELETE /admin/v1/banners`(弹窗编辑,定时投放时段) |
+| `/banners` | Banner 配置 | `GET/POST/DELETE /admin/v1/banners`(弹窗编辑,定时投放时段;图片经 UploadImage 组件直传对象存储,手填外链会被后端拒绝) |
 | `/notices` | 公告群发 | `POST /admin/v1/notices`(全员推送,二次确认) |
 | `/words` | 敏感词库 | `GET/POST /admin/v1/words`、`DELETE /admin/v1/words/:id`(词面/分类/等级/状态筛选,保存即热更新过滤器) |
 | `/faqs` | AI 管家 FAQ | `GET/POST /admin/v1/faqs`、`DELETE /admin/v1/faqs/:id`(关键词竖线分隔,优先级升序命中,即时生效) |

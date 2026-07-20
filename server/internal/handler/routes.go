@@ -128,6 +128,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/login", Handler: adminLoginHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/login/totp", Handler: adminTotpLoginHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/password", Handler: adminChangePwdHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/upload/presign", Handler: adminPresignHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/totp/status", Handler: adminTotpStatusHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/totp/setup", Handler: adminTotpSetupHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/totp/confirm", Handler: adminTotpConfirmHandler(svcCtx)},

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/yiora/server/internal/logic/draftlogic"
+	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -53,6 +54,9 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 	}
 	if len(req.Images) > maxImages {
 		return nil, xerr.Param(fmt.Sprintf("最多上传 %d 张图片", maxImages))
+	}
+	if err := l.checkImages(req.Images); err != nil {
+		return nil, err
 	}
 	if req.LinkType != 0 {
 		if !strings.HasPrefix(req.LinkURL, "https://") && !strings.HasPrefix(req.LinkURL, "http://") {
@@ -159,6 +163,16 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 		}
 	}
 	return &types.CreatePostResp{PostID: postID, Status: status, Tip: tip}, nil
+}
+
+// checkImages 帖图必须来自我方对象存储(直传 fileUrl),防外链注入。
+func (l *Logic) checkImages(images []types.ImageReq) error {
+	for _, img := range images {
+		if !uploadlogic.AllowedImageURL(l.svcCtx.Config, img.URL) {
+			return xerr.Param("图片链接不合法,请通过上传接口获取")
+		}
+	}
+	return nil
 }
 
 // checkTopics 话题名规范化:去 #/去空白/去重,≤5 个,每个 1-30 字且不含违禁词。
@@ -374,6 +388,9 @@ func (l *Logic) Edit(ctx context.Context, uid int64, req *types.EditPostReq) (*t
 	}
 	if len(req.Images) > maxImages {
 		return nil, xerr.Param(fmt.Sprintf("最多上传 %d 张图片", maxImages))
+	}
+	if err := l.checkImages(req.Images); err != nil {
+		return nil, err
 	}
 	if req.LinkType != 0 {
 		if !strings.HasPrefix(req.LinkURL, "https://") && !strings.HasPrefix(req.LinkURL, "http://") {

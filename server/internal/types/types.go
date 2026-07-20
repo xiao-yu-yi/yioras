@@ -610,7 +610,7 @@ type AdminTaskSaveReq struct {
 // ---- 对象存储直传 ----
 
 type PresignReq struct {
-	Kind     string `json:"kind,options=avatar|cover|post|software|apk"` // 用途决定目录/大小/类型限制
+	Kind     string `json:"kind,options=avatar|cover|post|software|banner|deco|apk"` // 用途决定目录/大小/类型限制
 	FileName string `json:"fileName"`
 	Size     int64  `json:"size"` // 字节,用于服务端预校验
 }

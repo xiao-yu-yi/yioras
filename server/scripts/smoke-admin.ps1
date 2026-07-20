@@ -100,12 +100,23 @@ $l5 = AdminLogin "admin" "Admin#2026pwd"
 $ha = @{Authorization = "Bearer $($l5.data.token)"}
 Write-Output "[1.95] confirm=code$($cfm.code) relogin ticket=$([bool]$l2.data.totpRequired) code=code$($step2.code) replaySameCode=code$($replay.code) (expect 41002) recovery=code$($rec.code) recoveryReuse=code$($recDup.code) (expect 41002) left=$($st.recoveryCodesLeft) (expect 9) disable=code$($dis.code) afterDisable direct=$([bool]$l5.data.token)"
 
+# helper: upload a small real image and return its fileUrl (whitelist-compliant)
+function New-UploadedImage($presignUri, $headers, $kind) {
+    $p = PostJson $presignUri @{kind = $kind; fileName = "i.png"; size = 128} $headers
+    $t = Join-Path $env:TEMP ("smoke_a_" + [Guid]::NewGuid().ToString("N") + ".png")
+    [IO.File]::WriteAllBytes($t, (New-Object byte[] 128))
+    Invoke-WebRequest -Method Put -Uri $p.data.uploadUrl -InFile $t -UseBasicParsing | Out-Null
+    Remove-Item $t -ErrorAction SilentlyContinue
+    return $p.data.fileUrl
+}
+
 # 2. seed pending items: post with REVIEW word by a; comment with REVIEW word by b; software+version by b
 $pp = PostJson "$api/posts" @{circleId = 2; title = "audit me"; content = "hello REVIEWWORD_SAMPLE"} $h1
 $target = PostJson "$api/posts" @{circleId = 2; content = "comment target"} $h1
 $pc = PostJson "$api/comments" @{postId = $target.data.postId; content = "cmt REVIEWWORD_SAMPLE"} $h2
 $cats = (Invoke-RestMethod "$api/software/categories?type=1").data
-$ps = PostJson "$api/software" @{name = "AuditSoft"; logo = "https://c/l.png"; intro = "intro"; images = @("https://c/1.jpg","https://c/2.jpg","https://c/3.jpg"); type = 1; categoryId = $cats[0].id; version = "1.0"; size = "1MB"; downloadUrl = "https://pan/x"} $h2
+$simg = New-UploadedImage "$api/upload/presign" $h2 "software"
+$ps = PostJson "$api/software" @{name = "AuditSoft"; logo = $simg; intro = "intro"; images = @($simg, $simg, $simg); type = 1; categoryId = $cats[0].id; version = "1.0"; size = "1MB"; downloadUrl = "https://pan/x"} $h2
 Write-Output "[2] pendPost=$($pp.data.postId)/s$($pp.data.status) pendCmt=$($pc.data.commentId)/s$($pc.data.status) pendSoft=$($ps.data.softwareId)/s$($ps.data.status)"
 
 # 3. audit queue lists all three
@@ -174,13 +185,15 @@ PostJson "$adm/users/$uidB/ban" @{action = 0} $ha | Out-Null
 $restoredLogin = PostJson "$api/auth/login" @{email = "b@test.com"; password = "pass1234"} $null
 Write-Output "[10] banned me=code$($bannedMe.code) login=code$($bannedLogin.code) restoredLogin=code$($restoredLogin.code)"
 
-# 11. banner CRUD -> home config reflects online banner
-$nb = PostJson "$adm/banners" @{title = "welcome"; image = "https://cdn.example.com/b1.png"; linkType = 0; sort = 1; status = 1} $ha
+# 11. banner CRUD (image uploaded via admin presign) -> home config reflects online banner
+$bimg = New-UploadedImage "$adm/upload/presign" $ha "banner"
+$extBanner = PostJson "$adm/banners" @{title = "ext"; image = "https://evil.example.com/b.png"; linkType = 0; status = 1} $ha
+$nb = PostJson "$adm/banners" @{title = "welcome"; image = $bimg; linkType = 0; sort = 1; status = 1} $ha
 $blist = (Invoke-RestMethod "$adm/banners" -Headers $ha).data
 $homeCfg = (Invoke-RestMethod "$api/home/config").data
 Invoke-RestMethod -Method Delete -Uri "$adm/banners/$($nb.data.id)" -Headers $ha | Out-Null
 $homeCfg2 = (Invoke-RestMethod "$api/home/config").data
-Write-Output "[11] banner id=$($nb.data.id) adminList=$(@($blist).Count) homeBanners=$(@($homeCfg.banners).Count) afterDelete=$(@($homeCfg2.banners).Count)"
+Write-Output "[11] extBanner=code$($extBanner.code) (expect 40000) banner id=$($nb.data.id) adminList=$(@($blist).Count) homeBanners=$(@($homeCfg.banners).Count) afterDelete=$(@($homeCfg2.banners).Count)"
 
 # 11.5 content search + one-click takedown/restore with counter rollback
 $cs = (Invoke-RestMethod "$adm/contents?type=1&keyword=circle3" -Headers $ha).data
@@ -229,10 +242,11 @@ $blast = ($bhist | Sort-Object seq | Select-Object -Last 1)
 Invoke-RestMethod -Method Delete -Uri "$adm/faqs/$($nf.data.id)" -Headers $ha | Out-Null
 Write-Output "[11.95] faq create=code$($nf.code) botReply=[$($blast.content)] (expect SMOKE FAQ REPLY)"
 
-# 11.97 mall/task ops config: create deco -> visible in shop -> offline -> gone; prize + task validation
-$ndc = PostJson "$adm/mall/decorations" @{kind = 1; name = "SmokeFrame"; preview = "https://cdn.example.com/f/smoke.png"; price = 5; durationDays = 7} $ha
+# 11.97 mall/task ops config: create deco (preview via admin presign) -> visible in shop -> offline -> gone; prize + task validation
+$dimg = New-UploadedImage "$adm/upload/presign" $ha "deco"
+$ndc = PostJson "$adm/mall/decorations" @{kind = 1; name = "SmokeFrame"; preview = $dimg; price = 5; durationDays = 7} $ha
 $shopSeen = @(((Invoke-RestMethod "$api/mall/decorations?kind=1" -Headers $h1).data) | Where-Object { $_.name -eq 'SmokeFrame' }).Count
-PostJson "$adm/mall/decorations" @{id = $ndc.data.id; kind = 1; name = "SmokeFrame"; preview = "https://cdn.example.com/f/smoke.png"; price = 5; durationDays = 7; status = 0} $ha | Out-Null
+PostJson "$adm/mall/decorations" @{id = $ndc.data.id; kind = 1; name = "SmokeFrame"; preview = $dimg; price = 5; durationDays = 7; status = 0} $ha | Out-Null
 $shopGone = @(((Invoke-RestMethod "$api/mall/decorations?kind=1" -Headers $h1).data) | Where-Object { $_.name -eq 'SmokeFrame' }).Count
 $npz = PostJson "$adm/mall/prizes" @{name = "SmokePrize"; kind = 1; amount = 3; weight = 5; stock = 2} $ha
 $badPz = PostJson "$adm/mall/prizes" @{name = "BadRef"; kind = 2; refId = 99999; weight = 5} $ha
@@ -262,7 +276,9 @@ $back = Invoke-WebRequest -Uri $pre.data.fileUrl -UseBasicParsing
 $same = ($back.Content.Length -eq 2048)
 $badExt = PostJson "$api/upload/presign" @{kind = "post"; fileName = "evil.exe"; size = 100} $h1
 $badSize = PostJson "$api/upload/presign" @{kind = "avatar"; fileName = "big.png"; size = 999999999} $h1
-Write-Output "[11.99] presign=code$($pre.code) putAndFetch same2KB=$same (expect True) badExt=code$($badExt.code) badSize=code$($badSize.code) (expect 40000x2)"
+$extAvatar = Invoke-RestMethod -Method Put -Uri "$api/user/me" -Headers $h1 -ContentType 'application/json' -Body '{"avatar":"https://evil.example.com/a.png"}'
+$okAvatar = Invoke-RestMethod -Method Put -Uri "$api/user/me" -Headers $h1 -ContentType 'application/json' -Body (@{avatar = $pre.data.fileUrl} | ConvertTo-Json -Compress)
+Write-Output "[11.99] presign=code$($pre.code) putAndFetch same2KB=$same (expect True) badExt=code$($badExt.code) badSize=code$($badSize.code) (expect 40000x2) extAvatar=code$($extAvatar.code) (expect 40000) okAvatar=code$($okAvatar.code)"
 Remove-Item $tmp -ErrorAction SilentlyContinue
 
 # 12. dashboard + op logs recorded

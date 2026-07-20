@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yiora/server/internal/config"
 	"github.com/yiora/server/internal/pkg/presign"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -30,7 +31,31 @@ var rules = map[string]kindRule{
 	"cover":    {maxSize: 10 << 20, exts: imageExts},
 	"post":     {maxSize: 10 << 20, exts: imageExts},
 	"software": {maxSize: 10 << 20, exts: imageExts},
+	"banner":   {maxSize: 10 << 20, exts: imageExts}, // 后台运营位
+	"deco":     {maxSize: 10 << 20, exts: imageExts}, // 后台装扮预览
 	"apk":      {maxSize: 500 << 20, exts: map[string]bool{".apk": true}},
+}
+
+// AllowedImageURL 图片 URL 域名白名单:配置了对象存储时,业务图片必须来自我方存储前缀
+// (PublicBaseURL/Bucket,兜底 Endpoint/Bucket),防外链盗刷与钓鱼图注入;
+// 未配置对象存储的部署退化为 http(s) 前缀检查(向后兼容)。
+func AllowedImageURL(cfg config.Config, u string) bool {
+	if len(u) > 255 || (!strings.HasPrefix(u, "https://") && !strings.HasPrefix(u, "http://")) {
+		return false
+	}
+	st := cfg.Storage
+	if st.Endpoint == "" || st.Bucket == "" {
+		return true
+	}
+	for _, base := range []string{st.PublicBaseURL, st.Endpoint} {
+		if base == "" {
+			continue
+		}
+		if strings.HasPrefix(u, strings.TrimRight(base, "/")+"/"+st.Bucket+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 type Logic struct {

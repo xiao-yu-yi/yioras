@@ -216,6 +216,9 @@ curl -X POST localhost:8888/api/v1/upload/presign -H "Authorization: Bearer $T" 
   -H "Content-Type: application/json" -d '{"kind":"post","fileName":"shot.png","size":2048}'
 # → {uploadUrl, fileUrl}:对 uploadUrl 发 PUT(body=文件原文,10 分钟内有效),fileUrl 回填业务接口
 # kind: avatar(5MB)/cover/post/software(10MB,图片) apk(500MB);类型/大小服务端白名单校验
+# 业务侧强制域名白名单:头像/封面/帖图/软件 logo·截图/Banner/装扮预览必须来自我方存储前缀,
+# 外链一律 40000(未配置 Storage 的部署退化为 http(s) 前缀检查);下载地址(网盘外链)不受限
+# 管理端同能力:POST /admin/v1/upload/presign(kind 另有 banner/deco)
 
 ## 回归冒烟基线(发版前必跑)
 

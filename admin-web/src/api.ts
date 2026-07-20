@@ -276,6 +276,15 @@ export const api = {
     }>,
   categories: () => http.get('/software/categories') as Promise<AdminCategoryItem[]>,
   saveCategory: (c: Partial<AdminCategoryItem>) => http.post('/software/categories', c) as Promise<{ id: number }>,
+  presign: (kind: string, fileName: string, size: number) =>
+    http.post('/upload/presign', { kind, fileName, size }) as Promise<{ uploadUrl: string; fileUrl: string }>,
+}
+
+// uploadFile 预签名直传:签名 → 裸 PUT 文件到对象存储 → 返回可落库的公开 URL
+export async function uploadFile(kind: string, file: File): Promise<string> {
+  const { uploadUrl, fileUrl } = await api.presign(kind, file.name, file.size)
+  await axios.put(uploadUrl, file, { headers: { 'Content-Type': file.type || 'application/octet-stream' } })
+  return fileUrl
 }
 
 export interface AdminCategoryItem {

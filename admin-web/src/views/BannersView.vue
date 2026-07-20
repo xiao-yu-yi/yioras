@@ -40,8 +40,8 @@
         <el-form-item label="标题" required>
           <el-input v-model="form.title" maxlength="50" show-word-limit />
         </el-form-item>
-        <el-form-item label="图片 URL" required>
-          <el-input v-model="form.image" placeholder="https://..." />
+        <el-form-item label="图片" required>
+          <UploadImage :model-value="form.image ?? ''" kind="banner" @update:model-value="form.image = $event" />
         </el-form-item>
         <el-form-item label="跳转类型">
           <el-select v-model="form.linkType" style="width: 100%">
@@ -82,6 +82,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, type BannerItem } from '../api'
+import UploadImage from '../components/UploadImage.vue'
 
 const rows = ref<BannerItem[]>([])
 const loading = ref(false)
@@ -116,8 +117,8 @@ function openEdit(row?: BannerItem) {
 }
 
 async function save() {
-  if (!form.title?.trim() || !form.image?.startsWith('http')) {
-    ElMessage.warning('标题与图片 URL 必填')
+  if (!form.title?.trim() || !form.image) {
+    ElMessage.warning('标题与图片必填')
     return
   }
   saving.value = true

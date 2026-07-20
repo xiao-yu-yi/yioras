@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yiora/server/internal/logic/adminlogic"
+	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/pkg/jwtx"
 	"github.com/yiora/server/internal/pkg/resp"
 	"github.com/yiora/server/internal/pkg/xerr"
@@ -680,6 +681,23 @@ func adminSaveCategoryHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		resp.OK(w, r, map[string]int64{"id": cid})
+	})
+}
+
+// adminPresignHandler 管理端直传签名(Banner 图/装扮预览等),uid 记 adminID 便于按目录溯源。
+func adminPresignHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.PresignReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := uploadlogic.New(svcCtx).Presign(r.Context(), id.AdminID, &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
 	})
 }
 

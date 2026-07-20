@@ -105,7 +105,9 @@
           </el-select>
         </el-form-item>
         <el-form-item label="名称" required><el-input v-model="decoForm.name" maxlength="30" /></el-form-item>
-        <el-form-item label="预览 URL" required><el-input v-model="decoForm.preview" placeholder="https://..." /></el-form-item>
+        <el-form-item label="预览图" required>
+          <UploadImage :model-value="decoForm.preview ?? ''" kind="deco" @update:model-value="decoForm.preview = $event" />
+        </el-form-item>
         <el-form-item label="价格(忧珠)"><el-input-number v-model="decoForm.price" :min="0" /></el-form-item>
         <el-form-item label="时效(天)">
           <el-input-number v-model="decoForm.durationDays" :min="0" />
@@ -184,6 +186,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api, type AdminDecoItem, type AdminPrizeItem, type AdminTaskCfgItem } from '../api'
+import UploadImage from '../components/UploadImage.vue'
 
 const tabNames: Record<string, string> = { deco: '装扮', prize: '奖品', task: '任务' }
 const actionNames: Record<string, string> = { post: '发帖', comment: '评论', like: '点赞', browse: '浏览' }
@@ -231,8 +234,8 @@ function openEdit(row?: AdminDecoItem | AdminPrizeItem | AdminTaskCfgItem) {
 }
 
 async function saveDeco() {
-  if (!decoForm.name?.trim() || !decoForm.preview?.startsWith('http')) {
-    ElMessage.warning('名称与预览 URL 必填')
+  if (!decoForm.name?.trim() || !decoForm.preview) {
+    ElMessage.warning('名称与预览图必填')
     return
   }
   saving.value = true
