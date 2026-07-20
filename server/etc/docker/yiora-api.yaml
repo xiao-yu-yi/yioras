@@ -39,3 +39,6 @@ Storage:
   Bucket: yiora
   AccessKey: yiora-minio
   SecretKey: yiora-minio-secret
+
+ImgScan:
+  Provider: mock # dev/smoke only: URL with mock-review/mock-block triggers verdicts; prod uses tencent (phase 2)

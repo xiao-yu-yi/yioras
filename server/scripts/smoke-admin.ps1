@@ -330,6 +330,17 @@ $delOk = Invoke-RestMethod -Method Delete -Uri "$adm/mall/prettynos/$($np2.data.
 $soldDel = Invoke-RestMethod -Method Delete -Uri "$adm/mall/prettynos/999" -Headers $ha
 Write-Output "[12.35] teenOn=$($teenSet.teenMode) draw=code$($teenDraw.code) (expect 40300); shareCode=$($share.data.code) reuse=$($share.data.code -eq $share2.data.code) resolvePost=$($resolved.postId) (expect $($target.data.postId)) badCode=code$($badCode.code) (expect 40400); prettyDel=code$($delOk.code) missingDel=code$($soldDel.code) (expect 40300)"
 
+# 12.36 imgscan (mock driver): review image -> human audit queue; block image -> auto reject + author system notice
+$imgRev = PostJson "$api/posts" @{circleId = 2; content = "imgscan review case"; images = @(@{url = "http://localhost:9000/yiora/smoke/mock-review.png"})} $h1
+$imgBlk = PostJson "$api/posts" @{circleId = 2; content = "imgscan block case"; images = @(@{url = "http://localhost:9000/yiora/smoke/mock-block.png"})} $h1
+Start-Sleep -Seconds 2
+$aq2 = (Invoke-RestMethod "$adm/audits" -Headers $ha).data
+$revQueued = @($aq2 | Where-Object { $_.bizType -eq 1 -and $_.bizId -eq $imgRev.data.postId }).Count
+$revVisible = (Invoke-RestMethod "$api/posts/$($imgRev.data.postId)").code
+$blkGone = (Invoke-RestMethod "$api/posts/$($imgBlk.data.postId)").code
+$blkNotice = @((Invoke-RestMethod "$api/notifications?type=3" -Headers $h1).data | Where-Object { $_.targetId -eq $imgBlk.data.postId }).Count
+Write-Output "[12.36] reviewImg posted=$($imgRev.data.status) queued=$revQueued (expect 1) stillVisible=code$revVisible (expect 0); blockImg gone=code$blkGone (expect 40400) authorNotified=$blkNotice (expect 1)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

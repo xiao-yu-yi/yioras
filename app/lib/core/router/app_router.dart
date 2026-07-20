@@ -19,7 +19,9 @@ import '../../features/profile/view/profile_page.dart';
 import '../../features/profile/view/settings_page.dart';
 import '../../features/publish/view/publish_post_page.dart';
 import '../../features/publish/view/publish_software_page.dart';
+import '../../features/search/view/search_page.dart';
 import '../../features/shell/main_shell.dart';
+import '../../features/software/view/software_detail_page.dart';
 import '../../features/user/view/user_profile_page.dart';
 import 'routes.dart';
 
@@ -84,6 +86,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.postDetail,
         builder: (context, state) =>
             PostDetailPage(postId: int.parse(state.pathParameters['id']!)),
+      ),
+      GoRoute(
+        path: Routes.softwareDetail,
+        builder: (context, state) => SoftwareDetailPage(
+          softwareId: int.parse(state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: Routes.search,
+        builder: (context, state) => const SearchPage(),
       ),
       GoRoute(
         path: Routes.notifications,

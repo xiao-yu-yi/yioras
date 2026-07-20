@@ -4,6 +4,7 @@ import (
 	"github.com/yiora/server/internal/config"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/emailx"
+	"github.com/yiora/server/internal/pkg/imgscan"
 	"github.com/yiora/server/internal/pkg/ipallow"
 	"github.com/yiora/server/internal/pkg/search"
 	"github.com/yiora/server/internal/pkg/sensitive"
@@ -22,6 +23,7 @@ type ServiceContext struct {
 	Filter *sensitive.Filter // 发布/评论/私信共用的敏感词机审
 	Search search.Searcher   // 全站搜索,当前 MySQL LIKE,可换 Meilisearch
 	AdminIPs *ipallow.List   // 后台访问 IP 白名单(启动时解析)
+	ImgScanner imgscan.Scanner // 图片机审驱动,nil=关闭(直传后异步送审)
 
 	UserModel      *model.UserModel
 	CircleModel    *model.CircleModel
@@ -53,10 +55,15 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		logx.Must(err) // 白名单写错宁可起不来,不能静默放行
 	}
+	scanner, err := imgscan.New(c.ImgScan.Provider)
+	if err != nil {
+		logx.Must(err) // provider 写错宁可起不来,不能静默关闭机审
+	}
 	return &ServiceContext{
 		Config: c,
 		Redis:  redis.MustNewRedis(c.Redis),
 		AdminIPs: adminIPs,
+		ImgScanner: scanner,
 		Email: emailx.NewSender(emailx.Config{
 			Host: c.Email.Host, Port: c.Email.Port,
 			Username: c.Email.Username, Password: c.Email.Password,

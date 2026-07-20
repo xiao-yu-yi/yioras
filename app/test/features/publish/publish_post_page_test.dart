@@ -22,9 +22,6 @@ class _FakePublishRepository implements PublishRepository {
 
   @override
   Future<void> publishSoftware(SoftwareDraft draft) async {}
-
-  @override
-  Future<List<String>> fetchSoftwareCategories(int type) async => const ['工具'];
 }
 
 class _FakeCircleRepository implements CircleRepository {

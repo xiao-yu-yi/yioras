@@ -375,6 +375,17 @@ func (m *PostModel) Takedown(ctx context.Context, circleID, postID int64) (autho
 	return authorID, hit, err
 }
 
+// MachineReject 机审高置信违规自动驳回(仅动待审/已发布帖,人工可在后台翻案恢复)。
+func (m *PostModel) MachineReject(ctx context.Context, postID int64) error {
+	_, err := m.conn.ExecCtx(ctx,
+		"UPDATE `post` SET status = ? WHERE id = ? AND status IN (?, ?)",
+		PostStatusRejected, postID, PostStatusPending, PostStatusPublished)
+	if err != nil {
+		return fmt.Errorf("machine reject post: %w", err)
+	}
+	return nil
+}
+
 // IncrShareCount 分享口令生成计数。
 func (m *PostModel) IncrShareCount(ctx context.Context, postID int64) error {
 	_, err := m.conn.ExecCtx(ctx,

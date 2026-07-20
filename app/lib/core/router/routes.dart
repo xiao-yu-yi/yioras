@@ -15,6 +15,8 @@ abstract final class Routes {
   static const publishPost = '/publish/post';
   static const publishSoftware = '/publish/software';
   static const postDetail = '/posts/:id';
+  static const softwareDetail = '/software/:id';
+  static const search = '/search';
   static const notifications = '/notifications/:type';
   static const chat = '/chat/:id';
   static const userProfile = '/users/:id';
@@ -24,6 +26,8 @@ abstract final class Routes {
   static String circleDetailPath(int id) => '/circles/$id';
 
   static String postDetailPath(int id) => '/posts/$id';
+
+  static String softwareDetailPath(int id) => '/software/$id';
 
   static String chatPath(int conversationId) => '/chat/$conversationId';
 

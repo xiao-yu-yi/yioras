@@ -69,6 +69,14 @@ services:
       YIORA_SMTP_USER: ${YIORA_SMTP_USER:?required}
       YIORA_SMTP_PASSWORD: ${YIORA_SMTP_PASSWORD:?required}
       YIORA_SMTP_FROM: ${YIORA_SMTP_FROM:?required}
+      # 对象存储与图片机审:未接入时留空(上传接口报未配置,机审关闭)
+      YIORA_S3_ENDPOINT: ${YIORA_S3_ENDPOINT:-}
+      YIORA_S3_PUBLIC_URL: ${YIORA_S3_PUBLIC_URL:-}
+      YIORA_S3_REGION: ${YIORA_S3_REGION:-us-east-1}
+      YIORA_S3_BUCKET: ${YIORA_S3_BUCKET:-}
+      YIORA_S3_ACCESS_KEY: ${YIORA_S3_ACCESS_KEY:-}
+      YIORA_S3_SECRET_KEY: ${YIORA_S3_SECRET_KEY:-}
+      YIORA_IMGSCAN_PROVIDER: ${YIORA_IMGSCAN_PROVIDER:-}
     depends_on:
       mysql:
         condition: service_healthy

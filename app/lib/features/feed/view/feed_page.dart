@@ -7,38 +7,69 @@ import '../../../core/router/routes.dart';
 import '../../home/data/home_config_repository.dart';
 import '../../home/widget/home_banner_carousel.dart';
 import '../../home/widget/pinned_post_bar.dart';
+import '../../software/view/software_library_view.dart';
 import '../controller/feed_controller.dart';
 import '../widget/post_card.dart';
 
-/// 首页（文档 3.2）：公告 Banner + 置顶精选 + 推荐信息流（单列表）。
-/// 覆盖状态：首屏骨架屏 / 首屏失败重试 / 空态 / 下拉刷新 / 上拉分页 / 分页失败重试 / 到底提示。
-class FeedPage extends ConsumerWidget {
+/// 首页（文档 3.2）：顶部一级 Tab「首页 / 应用 / 商城」+ 全局搜索入口。
+/// 首页 Tab：公告 Banner + 置顶精选 + 推荐信息流；应用 Tab：社区软件库（M3）；
+/// 商城 Tab 为 M4 范围，暂提示开发中。
+class FeedPage extends ConsumerStatefulWidget {
   const FeedPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FeedPage> createState() => _FeedPageState();
+}
+
+class _FeedPageState extends ConsumerState<FeedPage> {
+  /// 0 首页 / 1 应用
+  int _tab = 0;
+
+  /// 应用 Tab 是否已进入过（懒加载：未访问不发软件库请求）
+  bool _libraryVisited = false;
+
+  void _switchTab(int index) {
+    if (index == _tab) return;
+    setState(() {
+      _tab = index;
+      if (index == 1) _libraryVisited = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final feed = ref.watch(feedControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: const _TopTabs(),
+        title: _TopTabs(current: _tab, onChanged: _switchTab),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: _SearchButton(onTap: () => _showComingSoon(context, '搜索')),
+            child: _SearchButton(onTap: () => context.push(Routes.search)),
           ),
         ],
       ),
-      body: switch (feed) {
-        AsyncData(:final value) => _FeedList(state: value),
-        AsyncError(:final error) => _FirstLoadError(
-          message: error is ApiException ? error.message : '加载失败，请稍后重试',
-          onRetry: () =>
-              ref.read(feedControllerProvider.notifier).retryFirstLoad(),
-        ),
-        _ => const _FeedSkeleton(),
-      },
+      // IndexedStack 保活两个 Tab 的滚动位置；软件库懒加载
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          switch (feed) {
+            AsyncData(:final value) => _FeedList(state: value),
+            AsyncError(:final error) => _FirstLoadError(
+              message: error is ApiException ? error.message : '加载失败，请稍后重试',
+              onRetry: () =>
+                  ref.read(feedControllerProvider.notifier).retryFirstLoad(),
+            ),
+            _ => const _FeedSkeleton(),
+          },
+          if (_libraryVisited)
+            const SoftwareLibraryView()
+          else
+            const SizedBox.shrink(),
+        ],
+      ),
     );
   }
 }
@@ -49,46 +80,54 @@ void _showComingSoon(BuildContext context, String name) {
     ..showSnackBar(SnackBar(content: Text('「$name」正在开发中，敬请期待')));
 }
 
-/// 顶部一级导航：首页 / 应用(M3) / 商城(M4)，选中项加粗 + 品牌色下划线
+/// 顶部一级导航：首页 / 应用 / 商城(M4)，选中项加粗 + 品牌色下划线
 class _TopTabs extends StatelessWidget {
-  const _TopTabs();
+  const _TopTabs({required this.current, required this.onChanged});
+
+  final int current;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget tab(String label, {bool active = false}) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: active ? null : () => _showComingSoon(context, label),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: active ? 18 : 15.5,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-                color: active ? scheme.onSurface : scheme.onSurfaceVariant,
-              ),
+    Widget tab(String label, {bool active = false, VoidCallback? onTap}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: active ? null : onTap,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: active ? 18 : 15.5,
+                    fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                    color: active ? scheme.onSurface : scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Container(
+                  width: 18,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: active ? scheme.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 3),
-            Container(
-              width: 18,
-              height: 3,
-              decoration: BoxDecoration(
-                color: active ? scheme.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [tab('首页', active: true), tab('应用'), tab('商城')],
+      children: [
+        tab('首页', active: current == 0, onTap: () => onChanged(0)),
+        tab('应用', active: current == 1, onTap: () => onChanged(1)),
+        tab('商城', onTap: () => _showComingSoon(context, '商城')),
+      ],
     );
   }
 }

@@ -38,3 +38,6 @@ Storage:
   Bucket: yiora
   AccessKey: yiora-minio
   SecretKey: yiora-minio-secret
+
+ImgScan:
+  Provider: mock # 图片机审:空=关闭 mock=联调(URL 含 mock-review/mock-block 触发) tencent=二期云机审

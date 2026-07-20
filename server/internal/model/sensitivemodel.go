@@ -26,6 +26,7 @@ const (
 // 机审结果(对应 audit_queue.machine_result)
 const (
 	MachineSuspect = 2 // 疑似,转人审
+	MachineBlocked = 3 // 高置信违规,已自动拦截(留档供申诉翻案)
 )
 
 type (

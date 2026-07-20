@@ -49,4 +49,8 @@ type Config struct {
 		AccessKey     string `json:",optional"`
 		SecretKey     string `json:",optional"`
 	} `json:",optional"` // Endpoint 为空时上传接口返回未配置错误
+
+	ImgScan struct {
+		Provider string `json:",optional"` // ""=关闭 mock=联调冒烟 tencent/aliyun=二期云机审
+	} `json:",optional"`
 }

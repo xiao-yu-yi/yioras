@@ -4,6 +4,7 @@ package postlogic
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,6 +16,7 @@ import (
 	"github.com/yiora/server/internal/logic/draftlogic"
 	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/model"
+	"github.com/yiora/server/internal/pkg/imgscan"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
 	"github.com/yiora/server/internal/types"
@@ -145,6 +147,7 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 			logx.WithContext(ctx).Errorf("post %d audit enqueue: %v", postID, err)
 		}
 	}
+	l.scanImagesAsync(postID, uid, req.Images)
 	if status == model.PostStatusPublished {
 		l.taskProgress(ctx, uid, "post")
 		l.addExp(ctx, uid, 5)
@@ -508,7 +511,61 @@ func (l *Logic) Edit(ctx context.Context, uid int64, req *types.EditPostReq) (*t
 			logx.WithContext(ctx).Errorf("post %d audit enqueue: %v", p.ID, err)
 		}
 	}
+	l.scanImagesAsync(p.ID, uid, req.Images)
 	return &types.EditPostResp{Status: newStatus, Tip: tip}, nil
+}
+
+// scanImagesAsync 帖图异步机审:不阻塞发布,取全部图片中最严重结论落地。
+// review → 进人审队列(帖子保持原状态,人工定夺);block → 直接驳回下架+通知作者(可人工翻案)。
+// 云端出错按放行降级(纯人审兜底),绝不因外部依赖阻断业务。
+func (l *Logic) scanImagesAsync(postID, uid int64, imgs []types.ImageReq) {
+	if l.svcCtx.ImgScanner == nil || len(imgs) == 0 {
+		return
+	}
+	urls := make([]string, 0, len(imgs))
+	for _, im := range imgs {
+		urls = append(urls, im.URL)
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		worst, worstURL := (*imgscan.Result)(nil), ""
+		for _, u := range urls {
+			r, err := l.svcCtx.ImgScanner.Scan(ctx, u)
+			if err != nil {
+				logx.Errorf("imgscan post %d url %s: %v", postID, u, err)
+				continue
+			}
+			if worst == nil || r.Verdict > worst.Verdict {
+				worst, worstURL = r, u
+			}
+		}
+		if worst == nil || worst.Verdict == imgscan.VerdictPass {
+			return
+		}
+		detail, _ := json.Marshal(map[string]any{
+			"img": worstURL, "label": worst.Label, "score": worst.Score, "scanner": l.svcCtx.ImgScanner.Name(),
+		})
+		switch worst.Verdict {
+		case imgscan.VerdictReview:
+			if err := l.svcCtx.SensitiveModel.AddAudit(ctx, model.AuditBizPost, postID, model.MachineSuspect, string(detail)); err != nil {
+				logx.Errorf("imgscan post %d enqueue: %v", postID, err)
+			}
+		case imgscan.VerdictBlock:
+			if err := l.svcCtx.PostModel.MachineReject(ctx, postID); err != nil {
+				logx.Errorf("imgscan post %d reject: %v", postID, err)
+				return
+			}
+			if err := l.svcCtx.SensitiveModel.AddAudit(ctx, model.AuditBizPost, postID, model.MachineBlocked, string(detail)); err != nil {
+				logx.Errorf("imgscan post %d block audit: %v", postID, err)
+			}
+			l.notify(ctx, &model.Notification{
+				UserID: uid, Type: model.NotifyTypeSystem, ActorID: model.BotUID,
+				TargetType: model.LikeTargetPost, TargetID: postID,
+				Content: "你的帖子图片涉嫌违规已被系统拦截,如有异议请联系管理员申诉",
+			})
+		}
+	}()
 }
 
 // AuthorPosts 个人主页作品 Tab。本人可见待审/驳回帖。

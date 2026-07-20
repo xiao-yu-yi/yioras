@@ -42,6 +42,13 @@ class _FakeAuthRepository implements AuthRepository {
   }) async {}
 
   @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {}
+
+  @override
   Future<void> logout() async {}
 }
 

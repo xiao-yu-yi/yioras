@@ -40,3 +40,6 @@ Storage:
   Bucket: ${YIORA_S3_BUCKET}
   AccessKey: ${YIORA_S3_ACCESS_KEY}
   SecretKey: ${YIORA_S3_SECRET_KEY}
+
+ImgScan:
+  Provider: ${YIORA_IMGSCAN_PROVIDER} # 图片机审驱动:留空=关闭;tencent/aliyun 二期接入
