@@ -1,0 +1,12 @@
+allowBuilds:
+  '@parcel/watcher': set this to true or false
+  esbuild: set this to true or false
+  vue-demi: set this to true or false
+# pnpm 11+:构建脚本白名单从 package.json 迁到此处
+onlyBuiltDependencies:
+  - esbuild
+  - "@parcel/watcher"
+  - vue-demi
+  - core-js
+  - es5-ext
+  - typeit
