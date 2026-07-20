@@ -107,6 +107,16 @@ class ProfileDrawer extends ConsumerWidget {
                     },
                   ),
                   _DrawerItem(
+                    icon: Icons.upload_file_outlined,
+                    iconColor: const Color(0xFF8B5CF6),
+                    iconBg: const Color(0xFFF1ECFD),
+                    label: '我的发布',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push(Routes.myPublications);
+                    },
+                  ),
+                  _DrawerItem(
                     icon: Icons.receipt_long_outlined,
                     iconColor: const Color(0xFFF43F5E),
                     iconBg: const Color(0xFFFEECEF),

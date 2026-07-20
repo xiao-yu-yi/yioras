@@ -6,6 +6,7 @@ import (
 	"github.com/yiora/server/internal/pkg/emailx"
 	"github.com/yiora/server/internal/pkg/imgscan"
 	"github.com/yiora/server/internal/pkg/ipallow"
+	"github.com/yiora/server/internal/pkg/llm"
 	"github.com/yiora/server/internal/pkg/multipart"
 	"github.com/yiora/server/internal/pkg/search"
 	"github.com/yiora/server/internal/pkg/sensitive"
@@ -27,6 +28,7 @@ type ServiceContext struct {
 	AdminIPs *ipallow.List   // 后台访问 IP 白名单(启动时解析)
 	ImgScanner imgscan.Scanner // 图片机审驱动,nil=关闭(直传后异步送审)
 	Multipart *multipart.Client // S3 分片上传(APK 大文件),nil=对象存储未配置
+	LLM *llm.Client // AI 管家大模型,nil=纯 FAQ 规则模式
 
 	UserModel      *model.UserModel
 	CircleModel    *model.CircleModel
@@ -90,6 +92,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		ImgScanner: scanner,
 		Multipart: mpClient,
 		Meili: meiliClient,
+		LLM: llm.New(llm.Config{
+			BaseURL: c.LLM.BaseURL, APIKey: c.LLM.APIKey,
+			Model: c.LLM.Model, TimeoutSec: c.LLM.TimeoutSec,
+		}),
 		Email: emailx.NewSender(emailx.Config{
 			Host: c.Email.Host, Port: c.Email.Port,
 			Username: c.Email.Username, Password: c.Email.Password,

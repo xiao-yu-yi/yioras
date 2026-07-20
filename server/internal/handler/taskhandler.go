@@ -31,6 +31,22 @@ func searchHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+func suggestHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.SuggestReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := searchlogic.New(svcCtx).Suggest(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
 func taskListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, ok := mustUID(w, r)

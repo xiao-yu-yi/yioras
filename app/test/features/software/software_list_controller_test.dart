@@ -49,6 +49,10 @@ class _FakeSoftwareRepository implements SoftwareRepository {
 
   @override
   Future<List<SoftwareCategory>> fetchCategories(int type) async => const [];
+
+  @override
+  Future<SoftwarePage> fetchMine({int page = 1, int size = 20}) async =>
+      const SoftwarePage(list: [], hasMore: false);
 }
 
 ProviderContainer _container(SoftwareRepository repo) {

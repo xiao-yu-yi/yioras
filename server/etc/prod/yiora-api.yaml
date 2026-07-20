@@ -49,3 +49,9 @@ Search:
   Host: ${YIORA_MEILI_HOST}
   APIKey: ${YIORA_MEILI_KEY}
   SyncIntervalSec: 60
+
+LLM:
+  BaseURL: ${YIORA_LLM_BASE_URL} # 空=管家纯 FAQ 规则模式
+  APIKey: ${YIORA_LLM_API_KEY}
+  Model: ${YIORA_LLM_MODEL}
+  TimeoutSec: 5

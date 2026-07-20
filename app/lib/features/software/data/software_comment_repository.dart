@@ -62,7 +62,7 @@ class SoftwareCommentRepositoryHttp implements SoftwareCommentRepository {
         'bizType': 2,
         'bizId': softwareId,
         'content': content,
-        if (replyTo != null) 'parentId': replyTo,
+        'parentId': ?replyTo,
       },
     );
     return ApiResponse.fromJson(

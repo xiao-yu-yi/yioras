@@ -157,6 +157,65 @@ func (m *Meili) SearchTopics(ctx context.Context, kw string, offset, limit int) 
 	return m.db.TopicsByIDs(ctx, ids)
 }
 
+// Suggest 前缀即时搜联想:四域(帖标题/软件名/圈名/话题名)各取若干,带 <em> 高亮片段。
+func (m *Meili) Suggest(ctx context.Context, kw string, limit int) ([]model.SuggestItem, error) {
+	if !hasSearchableRune(kw) {
+		return nil, nil
+	}
+	type domain struct {
+		index  string
+		typ    string
+		field  string // 联想展示字段
+		filter string
+	}
+	domains := []domain{
+		{idxPosts, "post", "title", "status = 1 AND visibility = 0"},
+		{idxSoftware, "software", "name", fmt.Sprintf("status = %d", model.SoftwareStatusOnline)},
+		{idxCircles, "circle", "name", "status = 1"},
+		{idxTopics, "topic", "name", "status = 1"},
+	}
+	out := make([]model.SuggestItem, 0, limit*len(domains))
+	for _, d := range domains {
+		resp, err := m.client.Index(d.index).SearchWithContext(ctx, kw, &meilisearch.SearchRequest{
+			Limit:                 int64(limit),
+			Filter:                d.filter,
+			AttributesToRetrieve:  []string{"id", d.field},
+			AttributesToHighlight: []string{d.field},
+			HighlightPreTag:       "<em>",
+			HighlightPostTag:      "</em>",
+		})
+		if err != nil {
+			logx.WithContext(ctx).Errorf("meili suggest %s fallback: %v", d.index, err)
+			return m.db.Suggest(ctx, kw, limit) // 引擎故障整体降级前缀 LIKE
+		}
+		for _, h := range resp.Hits {
+			var id int64
+			var text string
+			if raw, ok := h["id"]; !ok || json.Unmarshal(raw, &id) != nil {
+				continue
+			}
+			if raw, ok := h[d.field]; ok {
+				_ = json.Unmarshal(raw, &text)
+			}
+			if text == "" {
+				continue
+			}
+			highlighted := text
+			if raw, ok := h["_formatted"]; ok {
+				var fm map[string]json.RawMessage
+				if json.Unmarshal(raw, &fm) == nil {
+					var hl string
+					if fraw, ok := fm[d.field]; ok && json.Unmarshal(fraw, &hl) == nil && hl != "" {
+						highlighted = hl
+					}
+				}
+			}
+			out = append(out, model.SuggestItem{Type: d.typ, ID: id, Text: text, Highlighted: highlighted})
+		}
+	}
+	return out, nil
+}
+
 var _ Searcher = (*Meili)(nil)
 
 // SyncDaemon 增量同步守护:帖子/用户按 updated_at 水位,圈子/软件/话题全量 upsert。

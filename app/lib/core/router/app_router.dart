@@ -17,6 +17,7 @@ import '../../features/messages/view/messages_page.dart';
 import '../../features/messages/view/notifications_page.dart';
 import '../../features/post_detail/view/post_detail_page.dart';
 import '../../features/profile/view/edit_profile_page.dart';
+import '../../features/profile/view/my_publications_page.dart';
 import '../../features/profile/view/profile_page.dart';
 import '../../features/profile/view/settings_page.dart';
 import '../../features/publish/view/publish_post_page.dart';
@@ -138,6 +139,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.youzhu,
         builder: (context, state) => const YouzhuPage(),
+      ),
+      GoRoute(
+        path: Routes.myPublications,
+        builder: (context, state) => const MyPublicationsPage(),
       ),
       // 底部 Tab 主壳：IndexedStack 保活各分支浏览位置
       StatefulShellRoute.indexedStack(

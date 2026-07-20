@@ -45,3 +45,7 @@ ImgScan:
 Search:
   Provider: mysql # mysql=LIKE;meili=中文分词引擎(需配 Host/APIKey,compose 内为 http://meili:7700)
   SyncIntervalSec: 60
+
+LLM:
+  BaseURL: "" # 空=管家纯 FAQ 规则;接大模型填 OpenAI 兼容端点(如 https://api.deepseek.com)+ APIKey
+  Model: deepseek-v4-flash

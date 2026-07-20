@@ -15,6 +15,8 @@ type Searcher interface {
 	SearchCircles(ctx context.Context, kw string, offset, limit int) ([]*model.Circle, error)
 	SearchSoftware(ctx context.Context, kw string, offset, limit int) ([]*model.Software, error)
 	SearchTopics(ctx context.Context, kw string, offset, limit int) ([]*model.Topic, error)
+	// Suggest 搜索联想:帖/软件/圈子/话题混合,meili 驱动带 <em> 高亮片段,mysql 驱动为前缀命中原文。
+	Suggest(ctx context.Context, kw string, limit int) ([]model.SuggestItem, error)
 }
 
 // 编译期断言:MySQL 实现满足接口。

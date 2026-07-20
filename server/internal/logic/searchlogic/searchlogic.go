@@ -24,6 +24,26 @@ type Logic struct {
 
 func New(svcCtx *svc.ServiceContext) *Logic { return &Logic{svcCtx: svcCtx} }
 
+// Suggest 搜索框联想(前缀即时搜):四域混合,meili 驱动带 <em> 高亮片段。
+func (l *Logic) Suggest(ctx context.Context, req *types.SuggestReq) (*types.SuggestResp, error) {
+	kw := strings.TrimSpace(req.Kw)
+	if kw == "" {
+		return nil, xerr.Param("关键词不能为空")
+	}
+	if utf8.RuneCountInString(kw) > maxKwRunes {
+		return nil, xerr.Param("关键词过长")
+	}
+	items, err := l.svcCtx.Search.Suggest(ctx, kw, 3)
+	if err != nil {
+		return nil, fmt.Errorf("suggest: %w", err)
+	}
+	out := make([]types.SuggestItem, 0, len(items))
+	for _, it := range items {
+		out = append(out, types.SuggestItem{Type: it.Type, ID: it.ID, Text: it.Text, Highlighted: it.Highlighted})
+	}
+	return &types.SuggestResp{Suggestions: out}, nil
+}
+
 // Search 按 type 检索一类结果;uid 用于个性化状态(liked/joined/followed)。
 func (l *Logic) Search(ctx context.Context, uid int64, req *types.SearchReq) (*types.SearchResp, error) {
 	kw := strings.TrimSpace(req.Kw)

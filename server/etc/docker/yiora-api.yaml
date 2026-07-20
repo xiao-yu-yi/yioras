@@ -48,3 +48,7 @@ Search:
   Host: http://meili:7700
   APIKey: compose-dev-meili-key
   SyncIntervalSec: 3 # dev/smoke: fast sync so tests can assert within seconds; prod uses 60
+
+LLM:
+  BaseURL: "" # empty = bot answers by FAQ rules only; phase-2: https://api.deepseek.com + key + model deepseek-v4-flash
+  Model: deepseek-v4-flash

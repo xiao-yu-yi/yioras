@@ -89,6 +89,44 @@ func (m *SearchModel) SearchTopics(ctx context.Context, kw string, offset, limit
 	return rows, nil
 }
 
+// SuggestItem 搜索联想条目。Highlighted 为带 <em> 标记的高亮片段(mysql 驱动无高亮,同原文)。
+type SuggestItem struct {
+	Type        string `json:"type"` // post / software / circle / topic
+	ID          int64  `json:"id"`
+	Text        string `json:"text"`
+	Highlighted string `json:"highlighted"`
+}
+
+// Suggest MySQL 前缀匹配联想(kw% 可走索引;LIKE 驱动的降级实现,无分词无高亮)。
+func (m *SearchModel) Suggest(ctx context.Context, kw string, limit int) ([]SuggestItem, error) {
+	prefix := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(kw) + "%"
+	type row struct {
+		ID   int64  `db:"id"`
+		Text string `db:"t"`
+	}
+	pull := func(q string) []row {
+		var rows []row
+		if err := m.conn.QueryRowsCtx(ctx, &rows, q, prefix, limit); err != nil {
+			return nil
+		}
+		return rows
+	}
+	out := make([]SuggestItem, 0, limit*4)
+	add := func(typ string, rows []row) {
+		for _, r := range rows {
+			if r.Text == "" {
+				continue
+			}
+			out = append(out, SuggestItem{Type: typ, ID: r.ID, Text: r.Text, Highlighted: r.Text})
+		}
+	}
+	add("post", pull(fmt.Sprintf("SELECT id, title AS t FROM `post` WHERE status = %d AND visibility = 0 AND title LIKE ? ORDER BY hot_score DESC LIMIT ?", PostStatusPublished)))
+	add("software", pull(fmt.Sprintf("SELECT id, name AS t FROM `software` WHERE status = %d AND name LIKE ? ORDER BY download_count DESC LIMIT ?", SoftwareStatusOnline)))
+	add("circle", pull("SELECT id, name AS t FROM `circle` WHERE status = 1 AND name LIKE ? ORDER BY hot_score DESC LIMIT ?"))
+	add("topic", pull("SELECT id, name AS t FROM `topic` WHERE status = 1 AND name LIKE ? ORDER BY hot_score DESC LIMIT ?"))
+	return out, nil
+}
+
 // ---- Meilisearch 同步:增量拉取(索引文档) + 按 ID 保序回表 ----
 
 // IndexDoc 送入搜索引擎的轻文档(检索字段+过滤字段+排序字段)。

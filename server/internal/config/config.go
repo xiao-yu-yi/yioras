@@ -60,4 +60,11 @@ type Config struct {
 		APIKey          string `json:",optional"`                          // MEILI_MASTER_KEY
 		SyncIntervalSec int    `json:",default=60"`                        // 增量同步周期
 	} `json:",optional"`
+
+	LLM struct {
+		BaseURL    string `json:",optional"` // OpenAI 兼容端点(如 https://api.deepseek.com);空=管家纯 FAQ 规则模式
+		APIKey     string `json:",optional"`
+		Model      string `json:",optional"` // 如 deepseek-v4-flash
+		TimeoutSec int    `json:",default=5"`
+	} `json:",optional"`
 }

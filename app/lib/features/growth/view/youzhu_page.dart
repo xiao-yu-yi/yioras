@@ -173,6 +173,8 @@ class _BalanceCard extends ConsumerWidget {
             height: 36,
             child: FilledButton(
               style: FilledButton.styleFrom(
+                // 覆盖全局主题的无限最小宽（Row 内会导致布局崩溃）
+                minimumSize: const Size(72, 36),
                 backgroundColor: const Color(0xFFFFD98A),
                 foregroundColor: const Color(0xFF2A2F3A),
                 padding: const EdgeInsets.symmetric(horizontal: 16),

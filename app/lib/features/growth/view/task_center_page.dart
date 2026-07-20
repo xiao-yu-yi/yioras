@@ -175,6 +175,8 @@ class _SignInCardState extends ConsumerState<_SignInCard> {
             height: 38,
             child: FilledButton(
               style: FilledButton.styleFrom(
+                // 覆盖全局主题的无限最小宽（Row 内会导致布局崩溃）
+                minimumSize: const Size(72, 38),
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFFF43F5E),
                 disabledBackgroundColor: Colors.white.withValues(alpha: .45),
@@ -351,6 +353,8 @@ class _StatusButton extends StatelessWidget {
         height: 30,
         child: FilledButton(
           style: FilledButton.styleFrom(
+            // 覆盖全局主题的无限最小宽（Row 内会导致布局崩溃）
+            minimumSize: const Size(60, 30),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(

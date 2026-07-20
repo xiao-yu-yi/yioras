@@ -37,6 +37,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodGet, Path: "/users/:id/fans", Handler: fansListHandler(svcCtx)},
 
 		{Method: http.MethodGet, Path: "/search", Handler: searchHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/search/suggest", Handler: suggestHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/software", Handler: softwareListHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/software/categories", Handler: softwareCategoriesHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/software/:id", Handler: softwareDetailHandler(svcCtx)},

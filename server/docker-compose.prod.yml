@@ -81,6 +81,10 @@ services:
       YIORA_SEARCH_PROVIDER: ${YIORA_SEARCH_PROVIDER:-mysql}
       YIORA_MEILI_HOST: ${YIORA_MEILI_HOST:-}
       YIORA_MEILI_KEY: ${YIORA_MEILI_KEY:-}
+      # AI 管家大模型:留空=纯 FAQ 规则模式
+      YIORA_LLM_BASE_URL: ${YIORA_LLM_BASE_URL:-}
+      YIORA_LLM_API_KEY: ${YIORA_LLM_API_KEY:-}
+      YIORA_LLM_MODEL: ${YIORA_LLM_MODEL:-deepseek-v4-flash}
     depends_on:
       mysql:
         condition: service_healthy

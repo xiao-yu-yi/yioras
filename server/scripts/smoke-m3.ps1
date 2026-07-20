@@ -60,4 +60,11 @@ Start-Sleep -Seconds 6
 $zhHits = (Invoke-RestMethod ("$api/search?type=post&kw=" + [uri]::EscapeDataString($zhKw))).data
 Write-Output "[7] zhPost=code$($zhPost.code) tokenizedHits=$($zhHits.posts.Count) (expect >=1; LIKE would give 0)"
 
+# 8. search suggest: prefix instant-search returns the zh post with <em> highlight fragment
+$sugKw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("57u/6Imy"))
+$sug = (Invoke-RestMethod ("$api/search/suggest?kw=" + [uri]::EscapeDataString($sugKw))).data
+$sugPost = @($sug.suggestions | Where-Object { $_.type -eq 'post' })
+$sugHl = if ($sugPost.Count -gt 0) { $sugPost[0].highlighted -match '<em>' } else { $false }
+Write-Output "[8] suggest total=$($sug.suggestions.Count) postHits=$($sugPost.Count) (expect >=1) highlightTag=$sugHl (expect True)"
+
 Write-Output "M3_SMOKE_DONE"

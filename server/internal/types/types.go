@@ -98,6 +98,23 @@ type MultipartPartsResp struct {
 	URLs  []MultipartPartURL  `json:"urls"` // 未完成分片的新签 URL(续传直接用)
 }
 
+// ---- 搜索联想 ----
+
+type SuggestReq struct {
+	Kw string `form:"kw"`
+}
+
+type SuggestItem struct {
+	Type        string `json:"type"` // post / software / circle / topic
+	ID          int64  `json:"id"`
+	Text        string `json:"text"`
+	Highlighted string `json:"highlighted"` // 带 <em></em> 命中标记(mysql 驱动同 text)
+}
+
+type SuggestResp struct {
+	Suggestions []SuggestItem `json:"suggestions"`
+}
+
 // ---- 帖子分享口令 ----
 
 type SharePostResp struct {
