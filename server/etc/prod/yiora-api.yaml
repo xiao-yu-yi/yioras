@@ -32,3 +32,11 @@ Admin:
   IPAllowlist: ${YIORA_ADMIN_IP_ALLOWLIST} # 逗号分隔 IP/CIDR;留空=不限制(经反代时确保传真实客户端 IP)
   LoginFailLimit: 5
   LoginLockSec: 900
+
+Storage:
+  Endpoint: ${YIORA_S3_ENDPOINT} # S3 兼容端点(OSS/MinIO)
+  PublicBaseURL: ${YIORA_S3_PUBLIC_URL} # CDN/公开访问基址
+  Region: ${YIORA_S3_REGION}
+  Bucket: ${YIORA_S3_BUCKET}
+  AccessKey: ${YIORA_S3_ACCESS_KEY}
+  SecretKey: ${YIORA_S3_SECRET_KEY}

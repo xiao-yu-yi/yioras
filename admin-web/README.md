@@ -8,7 +8,8 @@ Vue 3 + TypeScript + Vite + Element Plus + Pinia。对接 `server` 的 `/admin/v
 | --- | --- | --- |
 | `/login` | 登录 | `GET /admin/v1/captcha` + `POST /admin/v1/login`(初始 admin/admin123,图形验证码,首登强制改密) |
 | `/change-password` | 改密 | `POST /admin/v1/password`;`mustChangePwd=true` 时路由守卫+后端双重拦截,改完才放行 |
-| `/admins` | 账号管理 | `GET/POST /admin/v1/admins`、`POST /admin/v1/admins/:id`、`GET /admin/v1/roles`(建号/角色分配/停用/重置密码,不能操作自己) |
+| `/admins` | 账号管理 | `GET/POST /admin/v1/admins`、`POST /admin/v1/admins/:id`、`GET /admin/v1/roles`(建号/角色分配/停用/重置密码/强制解绑二步验证,不能操作自己) |
+| `/security` | 安全设置 | `GET /admin/v1/totp/status`、`POST /admin/v1/totp/{setup,confirm,disable}`(TOTP 绑定流程+10 个一次性恢复码);开启后登录页自动出现二步验证输入 |
 | `/dashboard` | 数据看板 | `GET /admin/v1/dashboard` 八项指标+积压告警;`GET /admin/v1/dashboard/trend` ECharts 近 7/30/90 日注册·发帖·忧珠四曲线 |
 | `/audits` | 审核工作台 | `GET /admin/v1/audits`、`POST /admin/v1/audits/:id/decide`(帖/评/软件,驳回必填原因) |
 | `/contents` | 内容管理 | `GET /admin/v1/contents`(帖/评关键词+全状态检索) + `POST /admin/v1/contents/takedown`(一键下架/恢复,计数自动回补) |

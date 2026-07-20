@@ -66,6 +66,9 @@
         <el-form-item label="重置密码">
           <el-input v-model="editForm.newPassword" placeholder="留空不重置;重置后对方首登强制改密" show-password />
         </el-form-item>
+        <el-form-item label="二步验证">
+          <el-checkbox v-model="editForm.resetTotp">强制解绑(对方验证器丢失时使用)</el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDialog = false">取消</el-button>
@@ -91,7 +94,7 @@ const createForm = reactive({ username: '', password: '', roleId: 0 })
 
 const editDialog = ref(false)
 const current = ref<AdminAccountItem | null>(null)
-const editForm = reactive({ roleId: 0, newPassword: '' })
+const editForm = reactive({ roleId: 0, newPassword: '', resetTotp: false })
 const editEnabled = ref(true)
 
 function fmt(ms: number) {
@@ -130,7 +133,7 @@ async function create() {
 
 function openEdit(row: AdminAccountItem) {
   current.value = row
-  Object.assign(editForm, { roleId: row.roleId, newPassword: '' })
+  Object.assign(editForm, { roleId: row.roleId, newPassword: '', resetTotp: false })
   editEnabled.value = row.status === 1
   editDialog.value = true
 }
@@ -143,6 +146,7 @@ async function save() {
       roleId: editForm.roleId,
       status: editEnabled.value ? 1 : 0,
       newPassword: editForm.newPassword || undefined,
+      resetTotp: editForm.resetTotp || undefined,
     })
     ElMessage.success('已保存')
     editDialog.value = false

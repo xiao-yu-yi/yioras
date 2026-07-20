@@ -210,18 +210,20 @@ export interface AdminTaskCfgItem {
 export const api = {
   captcha: () => http.get('/captcha') as Promise<{ captchaId: string; image: string }>,
   login: (username: string, password: string, captchaId: string, captchaCode: string) =>
-    http.post('/login', { username, password, captchaId, captchaCode }) as Promise<{
-      token: string
-      username: string
-      perms: string[]
-      mustChangePwd: boolean
-    }>,
+    http.post('/login', { username, password, captchaId, captchaCode }) as Promise<LoginResult>,
+  loginTotp: (ticket: string, code: string) =>
+    http.post('/login/totp', { ticket, code }) as Promise<LoginResult>,
   changePassword: (oldPassword: string, newPassword: string) =>
     http.post('/password', { oldPassword, newPassword }),
+  totpStatus: () => http.get('/totp/status') as Promise<{ enabled: boolean; recoveryCodesLeft: number }>,
+  totpSetup: () =>
+    http.post('/totp/setup') as Promise<{ secret: string; uri: string; recoveryCodes: string[] }>,
+  totpConfirm: (code: string) => http.post('/totp/confirm', { code }),
+  totpDisable: (code: string) => http.post('/totp/disable', { code }),
   admins: () => http.get('/admins') as Promise<AdminAccountItem[]>,
   createAdmin: (username: string, password: string, roleId: number) =>
     http.post('/admins', { username, password, roleId }) as Promise<{ id: number }>,
-  updateAdmin: (id: number, patch: { roleId?: number; status?: number; newPassword?: string }) =>
+  updateAdmin: (id: number, patch: { roleId?: number; status?: number; newPassword?: string; resetTotp?: boolean }) =>
     http.post(`/admins/${id}`, patch),
   roles: () => http.get('/roles') as Promise<AdminRoleItem[]>,
   audits: (bizType: number, page: number) =>
@@ -282,4 +284,13 @@ export interface AdminCategoryItem {
   name: string
   sort: number
   status: number
+}
+
+export interface LoginResult {
+  token: string
+  username: string
+  perms: string[]
+  mustChangePwd: boolean
+  totpRequired?: boolean
+  ticket?: string
 }

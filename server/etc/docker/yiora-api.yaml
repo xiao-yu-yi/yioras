@@ -31,3 +31,11 @@ Admin:
   IPAllowlist: "" # comma-separated IP/CIDR allowlist for /admin/v1; empty = no restriction
   LoginFailLimit: 5
   LoginLockSec: 900
+
+Storage:
+  Endpoint: http://minio:9000 # in-network S3 endpoint used for signing
+  PublicBaseURL: http://localhost:9000 # what clients actually PUT/GET against
+  Region: us-east-1
+  Bucket: yiora
+  AccessKey: yiora-minio
+  SecretKey: yiora-minio-secret

@@ -102,6 +102,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/notifications/read", Handler: notifyReadHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/notifications/unread", Handler: unreadHandler(svcCtx)},
 
+		{Method: http.MethodPost, Path: "/upload/presign", Handler: presignHandler(svcCtx)},
+
 		{Method: http.MethodGet, Path: "/tasks", Handler: taskListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/tasks/sign-in", Handler: signInHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/tasks/:id/claim", Handler: claimTaskHandler(svcCtx)},
@@ -124,7 +126,12 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodGet, Path: "/captcha", Handler: adminCaptchaHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/login", Handler: adminLoginHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/login/totp", Handler: adminTotpLoginHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/password", Handler: adminChangePwdHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/totp/status", Handler: adminTotpStatusHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/totp/setup", Handler: adminTotpSetupHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/totp/confirm", Handler: adminTotpConfirmHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/totp/disable", Handler: adminTotpDisableHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/admins", Handler: adminAccountsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/admins", Handler: adminCreateAccountHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/admins/:id", Handler: adminUpdateAccountHandler(svcCtx)},

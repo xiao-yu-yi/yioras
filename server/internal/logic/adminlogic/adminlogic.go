@@ -4,7 +4,10 @@ package adminlogic
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +19,7 @@ import (
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/captcha"
 	"github.com/yiora/server/internal/pkg/jwtx"
+	"github.com/yiora/server/internal/pkg/totp"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
 	"github.com/yiora/server/internal/types"
@@ -65,6 +69,62 @@ func (l *Logic) Login(ctx context.Context, req *types.AdminLoginReq) (*types.Adm
 		return nil, xerr.New(xerr.CodeBadCredential, "账号或密码错误")
 	}
 	_, _ = l.svcCtx.Redis.DelCtx(ctx, loginFailKey(username)) // 成功即清空计数
+
+	// 已开二步验证:密码通过只发 5 分钟票据,凭 TOTP/恢复码换正式令牌
+	if a.TotpEnabled == 1 {
+		ticket := randTicket()
+		if err := l.svcCtx.Redis.SetexCtx(ctx, totpTicketKey(ticket), fmt.Sprintf("%d", a.ID), 300); err != nil {
+			return nil, fmt.Errorf("store totp ticket: %w", err)
+		}
+		return &types.AdminLoginResp{TotpRequired: true, Ticket: ticket, Username: a.Username}, nil
+	}
+	return l.issueToken(ctx, a)
+}
+
+// LoginTotp 二步验证:票据 + 动态口令/恢复码 → 正式管理令牌。
+func (l *Logic) LoginTotp(ctx context.Context, req *types.AdminTotpLoginReq) (*types.AdminLoginResp, error) {
+	idStr, err := l.svcCtx.Redis.GetCtx(ctx, totpTicketKey(req.Ticket))
+	if err != nil || idStr == "" {
+		return nil, xerr.New(xerr.CodeUnauthorized, "登录票据无效或已过期,请重新登录")
+	}
+	adminID, _ := strconv.ParseInt(idStr, 10, 64)
+	a, err := l.svcCtx.AdminModel.FindAdminByID(ctx, adminID)
+	if err != nil {
+		return nil, fmt.Errorf("find admin: %w", err)
+	}
+	if a.Status != 1 {
+		return nil, xerr.New(xerr.CodeForbidden, "账号已停用")
+	}
+	if !l.verifySecondFactor(ctx, a, req.Code) {
+		return nil, xerr.New(xerr.CodeBadCode, "动态口令错误或已被使用")
+	}
+	_, _ = l.svcCtx.Redis.DelCtx(ctx, totpTicketKey(req.Ticket)) // 票据一次性
+	return l.issueToken(ctx, a)
+}
+
+// verifySecondFactor 校验 6 位 TOTP(同码防重放)或一次性恢复码。
+func (l *Logic) verifySecondFactor(ctx context.Context, a *model.AdminUser, code string) bool {
+	code = strings.TrimSpace(code)
+	if a.TotpEnabled != 1 {
+		return false
+	}
+	if len(code) == totp.Digits {
+		step, ok := totp.Verify(a.TotpSecret, code, time.Now())
+		if !ok {
+			return false
+		}
+		// 同一时间步的码只能用一次(防抓包重放)
+		usedKey := fmt.Sprintf("admin:totp:used:%d:%d", a.ID, step)
+		set, err := l.svcCtx.Redis.SetnxExCtx(ctx, usedKey, "1", 120)
+		return err == nil && set
+	}
+	// 长度不符则按恢复码消费
+	used, err := l.svcCtx.AdminModel.UseRecoveryCode(ctx, a.ID, hashRecovery(code))
+	return err == nil && used
+}
+
+// issueToken 密码(及二步验证)通过后的统一发令牌出口。
+func (l *Logic) issueToken(ctx context.Context, a *model.AdminUser) (*types.AdminLoginResp, error) {
 	perms, err := l.svcCtx.AdminModel.RolePerms(ctx, a.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("role perms: %w", err)
@@ -78,6 +138,106 @@ func (l *Logic) Login(ctx context.Context, req *types.AdminLoginReq) (*types.Adm
 		Token: token, ExpireAt: expireAt, Username: a.Username, Perms: perms,
 		MustChangePwd: a.MustChangePwd == 1,
 	}, nil
+}
+
+func totpTicketKey(t string) string  { return "admin:totp:ticket:" + t }
+func totpPendingKey(id int64) string { return fmt.Sprintf("admin:totp:pending:%d", id) }
+
+func randTicket() string {
+	b := make([]byte, 24)
+	_, _ = cryptorand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func hashRecovery(code string) string {
+	sum := sha256.Sum256([]byte(strings.ToUpper(strings.TrimSpace(code))))
+	return hex.EncodeToString(sum[:])
+}
+
+// TotpStatus 当前账号二步验证状态。
+func (l *Logic) TotpStatus(ctx context.Context, adminID int64) (*types.TotpStatusResp, error) {
+	a, err := l.svcCtx.AdminModel.FindAdminByID(ctx, adminID)
+	if err != nil {
+		return nil, fmt.Errorf("find admin: %w", err)
+	}
+	left, err := l.svcCtx.AdminModel.RecoveryCodesLeft(ctx, adminID)
+	if err != nil {
+		return nil, fmt.Errorf("recovery left: %w", err)
+	}
+	return &types.TotpStatusResp{Enabled: a.TotpEnabled == 1, RecoveryCodesLeft: left}, nil
+}
+
+// TotpSetup 发起绑定:生成密钥与 10 个恢复码,暂存 Redis 10 分钟,confirm 验证通过才落库。
+func (l *Logic) TotpSetup(ctx context.Context, adminID int64) (*types.TotpSetupResp, error) {
+	a, err := l.svcCtx.AdminModel.FindAdminByID(ctx, adminID)
+	if err != nil {
+		return nil, fmt.Errorf("find admin: %w", err)
+	}
+	if a.TotpEnabled == 1 {
+		return nil, xerr.New(xerr.CodeTooFrequent, "已启用二步验证,如需换绑请先解绑")
+	}
+	secret, err := totp.NewSecret()
+	if err != nil {
+		return nil, err
+	}
+	codes := make([]string, 10)
+	hashes := make([]string, 10)
+	for i := range codes {
+		b := make([]byte, 5)
+		_, _ = cryptorand.Read(b)
+		codes[i] = strings.ToUpper(hex.EncodeToString(b)) // 10 位 hex 恢复码
+		hashes[i] = hashRecovery(codes[i])
+	}
+	pending, _ := json.Marshal(map[string]any{"secret": secret, "hashes": hashes})
+	if err := l.svcCtx.Redis.SetexCtx(ctx, totpPendingKey(adminID), string(pending), 600); err != nil {
+		return nil, fmt.Errorf("store totp pending: %w", err)
+	}
+	return &types.TotpSetupResp{
+		Secret: secret, URI: totp.URI(secret, a.Username, "Yiora-Admin"), RecoveryCodes: codes,
+	}, nil
+}
+
+// TotpConfirm 输入验证器当前口令,校验通过才真正启用(防绑错设备锁死账号)。
+func (l *Logic) TotpConfirm(ctx context.Context, adminID int64, req *types.TotpCodeReq, ip string) error {
+	raw, err := l.svcCtx.Redis.GetCtx(ctx, totpPendingKey(adminID))
+	if err != nil || raw == "" {
+		return xerr.New(xerr.CodeNotFound, "绑定会话已过期,请重新发起")
+	}
+	var pending struct {
+		Secret string   `json:"secret"`
+		Hashes []string `json:"hashes"`
+	}
+	if err := json.Unmarshal([]byte(raw), &pending); err != nil {
+		return fmt.Errorf("parse totp pending: %w", err)
+	}
+	if _, ok := totp.Verify(pending.Secret, req.Code, time.Now()); !ok {
+		return xerr.New(xerr.CodeBadCode, "动态口令错误,请核对验证器")
+	}
+	if err := l.svcCtx.AdminModel.EnableTotp(ctx, adminID, pending.Secret, pending.Hashes); err != nil {
+		return err
+	}
+	_, _ = l.svcCtx.Redis.DelCtx(ctx, totpPendingKey(adminID))
+	l.opLog(ctx, adminID, "admin.totp.enable", fmt.Sprintf("admin:%d", adminID), "", ip)
+	return nil
+}
+
+// TotpDisable 解绑:需当前动态口令或恢复码。
+func (l *Logic) TotpDisable(ctx context.Context, adminID int64, req *types.TotpCodeReq, ip string) error {
+	a, err := l.svcCtx.AdminModel.FindAdminByID(ctx, adminID)
+	if err != nil {
+		return fmt.Errorf("find admin: %w", err)
+	}
+	if a.TotpEnabled != 1 {
+		return xerr.New(xerr.CodeNotFound, "尚未启用二步验证")
+	}
+	if !l.verifySecondFactor(ctx, a, req.Code) {
+		return xerr.New(xerr.CodeBadCode, "动态口令错误或已被使用")
+	}
+	if err := l.svcCtx.AdminModel.DisableTotp(ctx, adminID); err != nil {
+		return err
+	}
+	l.opLog(ctx, adminID, "admin.totp.disable", fmt.Sprintf("admin:%d", adminID), "", ip)
+	return nil
 }
 
 func loginFailKey(username string) string { return "admin:login:fail:" + username }
@@ -260,8 +420,13 @@ func (l *Logic) UpdateAdmin(ctx context.Context, adminID int64, req *types.Admin
 	if err := l.svcCtx.AdminModel.UpdateAdmin(ctx, req.ID, req.RoleID, req.Status, hash); err != nil {
 		return err
 	}
+	if req.ResetTotp {
+		if err := l.svcCtx.AdminModel.DisableTotp(ctx, req.ID); err != nil {
+			return err
+		}
+	}
 	l.opLog(ctx, adminID, "admin.account.update",
-		fmt.Sprintf("admin:%d role:%d status:%d resetPwd:%t", req.ID, req.RoleID, req.Status, hash != ""), "", ip)
+		fmt.Sprintf("admin:%d role:%d status:%d resetPwd:%t resetTotp:%t", req.ID, req.RoleID, req.Status, hash != "", req.ResetTotp), "", ip)
 	return nil
 }
 

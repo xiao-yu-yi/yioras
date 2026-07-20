@@ -500,9 +500,7 @@ class _ActionBar extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: item(
-                liked
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
+                liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                 formatCount(likeCount),
                 color: liked ? scheme.primary : null,
                 weight: liked ? FontWeight.w600 : null,

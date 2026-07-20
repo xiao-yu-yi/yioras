@@ -10,6 +10,24 @@ function PostJson($uri, $obj, $headers) {
     return Invoke-RestMethod -Method Post -Uri $uri -ContentType 'application/json; charset=utf-8' -Body $bytes
 }
 
+# Get-Totp: RFC 6238 (SHA1/30s/6 digits) in pure PowerShell, mirrors server pkg/totp
+function Get-Totp($secretB32) {
+    $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    $bits = ""
+    foreach ($c in $secretB32.ToUpper().ToCharArray()) { $bits += [Convert]::ToString($alphabet.IndexOf($c), 2).PadLeft(5, '0') }
+    $keyLen = [Math]::Floor($bits.Length / 8)
+    $key = New-Object byte[] $keyLen
+    for ($i = 0; $i -lt $keyLen; $i++) { $key[$i] = [Convert]::ToByte($bits.Substring($i * 8, 8), 2) }
+    $step = [int64][Math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() / 30)
+    $msg = [BitConverter]::GetBytes($step)
+    [Array]::Reverse($msg)
+    $hmac = New-Object System.Security.Cryptography.HMACSHA1 (, $key)
+    $hash = $hmac.ComputeHash($msg)
+    $off = $hash[$hash.Length - 1] -band 0x0f
+    $bin = (($hash[$off] -band 0x7f) * 16777216) + ($hash[$off + 1] * 65536) + ($hash[$off + 2] * 256) + $hash[$off + 3]
+    return ($bin % 1000000).ToString("D6")
+}
+
 $la = PostJson "$api/auth/login" @{email = "a@test.com"; password = "pass1234"} $null
 $lb = PostJson "$api/auth/login" @{email = "b@test.com"; password = "pass1234"} $null
 $h1 = @{Authorization = "Bearer $($la.data.token)"}
@@ -63,6 +81,24 @@ $failTtl = (docker exec yiora-redis-1 redis-cli TTL "admin:login:fail:auditor1")
 docker exec yiora-redis-1 redis-cli DEL "admin:login:fail:auditor1" | Out-Null
 $unlocked = AdminLogin "auditor1" "Auditor2pwd"
 Write-Output "[1.8] lockedEvenRightPwd=code$($lockedRight.code) (expect 40300) ttl=$failTtl(<=900) afterUnlock=code$($unlocked.code) mustChange=$($unlocked.data.mustChangePwd)"
+
+# 1.95 TOTP two-factor: setup -> confirm -> re-login needs ticket+code -> replay blocked -> recovery code -> disable
+$setup = (Invoke-RestMethod -Method Post -Uri "$adm/totp/setup" -Headers $ha).data
+$cfm = PostJson "$adm/totp/confirm" @{code = (Get-Totp $setup.secret)} $ha
+$l2 = AdminLogin "admin" "Admin#2026pwd"
+$code2 = Get-Totp $setup.secret
+$step2 = PostJson "$adm/login/totp" @{ticket = $l2.data.ticket; code = $code2} $null
+$l3 = AdminLogin "admin" "Admin#2026pwd"
+$replay = PostJson "$adm/login/totp" @{ticket = $l3.data.ticket; code = $code2} $null
+$rec = PostJson "$adm/login/totp" @{ticket = $l3.data.ticket; code = $setup.recoveryCodes[0]} $null
+$l4 = AdminLogin "admin" "Admin#2026pwd"
+$recDup = PostJson "$adm/login/totp" @{ticket = $l4.data.ticket; code = $setup.recoveryCodes[0]} $null
+$ha = @{Authorization = "Bearer $($rec.data.token)"}
+$st = (Invoke-RestMethod "$adm/totp/status" -Headers $ha).data
+$dis = PostJson "$adm/totp/disable" @{code = $setup.recoveryCodes[1]} $ha
+$l5 = AdminLogin "admin" "Admin#2026pwd"
+$ha = @{Authorization = "Bearer $($l5.data.token)"}
+Write-Output "[1.95] confirm=code$($cfm.code) relogin ticket=$([bool]$l2.data.totpRequired) code=code$($step2.code) replaySameCode=code$($replay.code) (expect 41002) recovery=code$($rec.code) recoveryReuse=code$($recDup.code) (expect 41002) left=$($st.recoveryCodesLeft) (expect 9) disable=code$($dis.code) afterDisable direct=$([bool]$l5.data.token)"
 
 # 2. seed pending items: post with REVIEW word by a; comment with REVIEW word by b; software+version by b
 $pp = PostJson "$api/posts" @{circleId = 2; title = "audit me"; content = "hello REVIEWWORD_SAMPLE"} $h1
@@ -214,6 +250,20 @@ $dupCat = PostJson "$adm/software/categories" @{type = 1; name = "SmokeCat"} $ha
 PostJson "$adm/software/categories" @{id = $ncat.data.id; type = 1; name = "SmokeCat"; sort = 9; status = 0} $ha | Out-Null
 $catGone = @(((Invoke-RestMethod "$api/software/categories?type=1").data) | Where-Object { $_.name -eq 'SmokeCat' }).Count
 Write-Output "[11.98] trend days=$(@($tr.dates).Count) todayUsers=$($tr.users[-1]) (expect 5) todayPosts=$($tr.posts[-1]) (>0); category add=code$($ncat.code) seen=$catSeen->$catGone (expect 1->0) dup=code$($dupCat.code) (expect 42900)"
+
+# 11.99 presigned upload: sign -> real PUT to MinIO -> fetch back and compare; invalid ext/size rejected
+$tmp = Join-Path $env:TEMP "yiora_upload_test.png"
+$payload = New-Object byte[] 2048
+(New-Object Random).NextBytes($payload)
+[IO.File]::WriteAllBytes($tmp, $payload)
+$pre = PostJson "$api/upload/presign" @{kind = "post"; fileName = "shot.png"; size = 2048} $h1
+Invoke-WebRequest -Method Put -Uri $pre.data.uploadUrl -InFile $tmp -UseBasicParsing | Out-Null
+$back = Invoke-WebRequest -Uri $pre.data.fileUrl -UseBasicParsing
+$same = ($back.Content.Length -eq 2048)
+$badExt = PostJson "$api/upload/presign" @{kind = "post"; fileName = "evil.exe"; size = 100} $h1
+$badSize = PostJson "$api/upload/presign" @{kind = "avatar"; fileName = "big.png"; size = 999999999} $h1
+Write-Output "[11.99] presign=code$($pre.code) putAndFetch same2KB=$same (expect True) badExt=code$($badExt.code) badSize=code$($badSize.code) (expect 40000x2)"
+Remove-Item $tmp -ErrorAction SilentlyContinue
 
 # 12. dashboard + op logs recorded
 $dash = (Invoke-RestMethod "$adm/dashboard" -Headers $ha).data

@@ -16,6 +16,7 @@
         <el-menu-item index="/mall-config">商城/任务配置</el-menu-item>
         <el-menu-item index="/categories">软件分类</el-menu-item>
         <el-menu-item index="/admins">账号管理</el-menu-item>
+        <el-menu-item index="/security">安全设置</el-menu-item>
         <el-menu-item index="/oplogs">操作日志</el-menu-item>
       </el-menu>
     </el-aside>

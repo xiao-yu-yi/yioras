@@ -75,6 +75,74 @@ func adminCaptchaHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminTotpLoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminIPGuard(svcCtx, func(w http.ResponseWriter, r *http.Request) {
+		var req types.AdminTotpLoginReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).LoginTotp(r.Context(), &req)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminTotpStatusHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		out, err := adminlogic.New(svcCtx).TotpStatus(r.Context(), id.AdminID)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminTotpSetupHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		out, err := adminlogic.New(svcCtx).TotpSetup(r.Context(), id.AdminID)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
+func adminTotpConfirmHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.TotpCodeReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).TotpConfirm(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
+func adminTotpDisableHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.TotpCodeReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).TotpDisable(r.Context(), id.AdminID, &req, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
 func adminChangePwdHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
 		var req types.AdminChangePwdReq

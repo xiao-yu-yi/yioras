@@ -30,3 +30,11 @@ Admin:
   IPAllowlist: "" # 后台 IP 白名单,逗号分隔 IP/CIDR(如 "10.0.0.0/8,203.0.113.7");空=不限制
   LoginFailLimit: 5 # 同账号连续错密上限
   LoginLockSec: 900 # 锁定时长(秒)
+
+Storage:
+  Endpoint: http://127.0.0.1:9000 # S3 兼容端点(MinIO/OSS);留空则上传接口返回未配置
+  PublicBaseURL: http://127.0.0.1:9000 # 客户端直传/回源基址
+  Region: us-east-1
+  Bucket: yiora
+  AccessKey: yiora-minio
+  SecretKey: yiora-minio-secret

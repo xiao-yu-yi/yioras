@@ -19,6 +19,8 @@ type (
 		RoleID        int64  `db:"role_id"`
 		Status        int64  `db:"status"`
 		MustChangePwd int64  `db:"must_change_pwd"`
+		TotpSecret    string `db:"totp_secret"`
+		TotpEnabled   int64  `db:"totp_enabled"`
 	}
 
 	AuditItem struct {
@@ -36,10 +38,12 @@ type (
 
 func NewAdminModel(conn sqlx.SqlConn) *AdminModel { return &AdminModel{conn: conn} }
 
+const adminUserCols = "id, username, password_hash, role_id, status, must_change_pwd, totp_secret, totp_enabled"
+
 func (m *AdminModel) FindByUsername(ctx context.Context, username string) (*AdminUser, error) {
 	var a AdminUser
 	err := m.conn.QueryRowCtx(ctx, &a,
-		"SELECT id, username, password_hash, role_id, status, must_change_pwd FROM `admin_user` WHERE username = ? LIMIT 1", username)
+		"SELECT "+adminUserCols+" FROM `admin_user` WHERE username = ? LIMIT 1", username)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +53,67 @@ func (m *AdminModel) FindByUsername(ctx context.Context, username string) (*Admi
 func (m *AdminModel) FindAdminByID(ctx context.Context, id int64) (*AdminUser, error) {
 	var a AdminUser
 	err := m.conn.QueryRowCtx(ctx, &a,
-		"SELECT id, username, password_hash, role_id, status, must_change_pwd FROM `admin_user` WHERE id = ? LIMIT 1", id)
+		"SELECT "+adminUserCols+" FROM `admin_user` WHERE id = ? LIMIT 1", id)
 	if err != nil {
 		return nil, err
 	}
 	return &a, nil
+}
+
+// EnableTotp 落库启用二步验证:写 secret + 重建恢复码(哈希),同事务。
+func (m *AdminModel) EnableTotp(ctx context.Context, adminID int64, secret string, codeHashes []string) error {
+	return m.conn.TransactCtx(ctx, func(ctx context.Context, s sqlx.Session) error {
+		if _, err := s.ExecCtx(ctx,
+			"UPDATE `admin_user` SET totp_secret = ?, totp_enabled = 1 WHERE id = ?", secret, adminID); err != nil {
+			return fmt.Errorf("enable totp: %w", err)
+		}
+		if _, err := s.ExecCtx(ctx,
+			"DELETE FROM `admin_recovery_code` WHERE admin_id = ?", adminID); err != nil {
+			return fmt.Errorf("clear recovery codes: %w", err)
+		}
+		for _, h := range codeHashes {
+			if _, err := s.ExecCtx(ctx,
+				"INSERT INTO `admin_recovery_code` (admin_id, code_hash) VALUES (?, ?)", adminID, h); err != nil {
+				return fmt.Errorf("insert recovery code: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// DisableTotp 解绑二步验证并清空恢复码。
+func (m *AdminModel) DisableTotp(ctx context.Context, adminID int64) error {
+	return m.conn.TransactCtx(ctx, func(ctx context.Context, s sqlx.Session) error {
+		if _, err := s.ExecCtx(ctx,
+			"UPDATE `admin_user` SET totp_secret = '', totp_enabled = 0 WHERE id = ?", adminID); err != nil {
+			return fmt.Errorf("disable totp: %w", err)
+		}
+		if _, err := s.ExecCtx(ctx,
+			"DELETE FROM `admin_recovery_code` WHERE admin_id = ?", adminID); err != nil {
+			return fmt.Errorf("clear recovery codes: %w", err)
+		}
+		return nil
+	})
+}
+
+// UseRecoveryCode 消费恢复码(CAS 置 used_at,一次性)。返回 true=命中有效码。
+func (m *AdminModel) UseRecoveryCode(ctx context.Context, adminID int64, codeHash string) (bool, error) {
+	r, err := m.conn.ExecCtx(ctx,
+		"UPDATE `admin_recovery_code` SET used_at = NOW(3) WHERE admin_id = ? AND code_hash = ? AND used_at IS NULL LIMIT 1",
+		adminID, codeHash)
+	if err != nil {
+		return false, fmt.Errorf("use recovery code: %w", err)
+	}
+	n, _ := r.RowsAffected()
+	return n == 1, nil
+}
+
+// RecoveryCodesLeft 剩余可用恢复码数(安全设置页展示)。
+func (m *AdminModel) RecoveryCodesLeft(ctx context.Context, adminID int64) (int64, error) {
+	var n int64
+	err := m.conn.QueryRowCtx(ctx, &n,
+		"SELECT COUNT(1) FROM `admin_recovery_code` WHERE admin_id = ? AND used_at IS NULL", adminID)
+	return n, err
 }
 
 // UpdateAdminPassword 管理员改密,清除强制改密标记。

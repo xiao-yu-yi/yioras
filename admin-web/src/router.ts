@@ -23,6 +23,7 @@ const router = createRouter({
         { path: 'mall-config', component: () => import('./views/MallConfigView.vue') },
         { path: 'categories', component: () => import('./views/CategoriesView.vue') },
         { path: 'admins', component: () => import('./views/AdminsView.vue') },
+        { path: 'security', component: () => import('./views/SecurityView.vue') },
         { path: 'oplogs', component: () => import('./views/OpLogsView.vue') },
       ],
     },

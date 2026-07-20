@@ -26,6 +26,16 @@ class PostDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(postDetailControllerProvider(postId));
 
+    // 详情接口下发的点赞初始态并入全局点赞层（列表卡片同步展示，不覆盖本地操作）
+    ref.listen(postDetailControllerProvider(postId), (previous, next) {
+      final value = next.value;
+      if (value != null) {
+        ref
+            .read(postLikeControllerProvider.notifier)
+            .seed(postId, liked: value.detail.liked, count: value.likeCount);
+      }
+    });
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(

@@ -28,6 +28,7 @@ services:
       - ./sql/008_admin_seed.sql:/docker-entrypoint-initdb.d/008_admin_seed.sql:ro
       - ./sql/009_admin_security.sql:/docker-entrypoint-initdb.d/009_admin_security.sql:ro
       - ./sql/010_ops_mall_perm.sql:/docker-entrypoint-initdb.d/010_ops_mall_perm.sql:ro
+      - ./sql/011_admin_totp.sql:/docker-entrypoint-initdb.d/011_admin_totp.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot123"]
       interval: 5s
@@ -43,6 +44,34 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # S3 兼容对象存储:预签名直传联调用(quay 源,Docker Hub 直连常不可达)
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: yiora-minio
+      MINIO_ROOT_PASSWORD: yiora-minio-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 一次性初始化:建 bucket 并放开匿名读(上传仍需预签名)
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 yiora-minio yiora-minio-secret &&
+      mc mb -p local/yiora &&
+      mc anonymous set download local/yiora || true"
 
   api:
     build: .

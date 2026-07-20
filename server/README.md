@@ -175,6 +175,8 @@ curl -X POST localhost:8888/api/v1/software/1/versions -H "Authorization: Bearer
 # 管理后台(/admin/v1):独立管理令牌+RBAC,初始账号 admin/admin123 首登强制改密
 # 防护:图形验证码 + 同账号 5 次错密锁 15 分钟(Redis admin:login:fail:{user},DEL 可手动解锁)
 #      + IP 白名单(配置 Admin.IPAllowlist 逗号分隔 IP/CIDR,空=不限;prod 经 YIORA_ADMIN_IP_ALLOWLIST 注入)
+#      + TOTP 二步验证(RFC 6238):/totp/setup→confirm 绑定(10 恢复码),开启后 login 返回 ticket,
+#        POST /admin/v1/login/totp {ticket,code} 换正式令牌;同码防重放;丢失验证器用恢复码或超管在账号管理强制解绑
 curl localhost:8888/admin/v1/captcha                                                # 图形验证码(SVG,一次性 5 分钟)
 curl -X POST localhost:8888/admin/v1/login -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123","captchaId":"...","captchaCode":"..."}' # 拿管理 token($A);mustChangePwd=true 时其他接口 40300
@@ -208,6 +210,12 @@ curl -X POST localhost:8888/admin/v1/mall/tasks -H "Authorization: Bearer $A" \
   -H "Content-Type: application/json" \
   -d '{"name":"每日点赞","type":1,"action":"like","targetCount":3,"rewardYouzhu":5}' # id>0 更新;条目不物理删,用 status 上下架
 curl localhost:8888/admin/v1/oplogs -H "Authorization: Bearer $A"                   # 敏感操作留痕
+
+# 对象存储直传(S3 兼容,dev 用 compose 内 MinIO,控制台 localhost:9001)
+curl -X POST localhost:8888/api/v1/upload/presign -H "Authorization: Bearer $T" \
+  -H "Content-Type: application/json" -d '{"kind":"post","fileName":"shot.png","size":2048}'
+# → {uploadUrl, fileUrl}:对 uploadUrl 发 PUT(body=文件原文,10 分钟内有效),fileUrl 回填业务接口
+# kind: avatar(5MB)/cover/post/software(10MB,图片) apk(500MB);类型/大小服务端白名单校验
 
 ## 回归冒烟基线(发版前必跑)
 

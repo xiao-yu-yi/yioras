@@ -9,8 +9,10 @@ import '../../../core/utils/time_format.dart';
 import '../../feed/widget/post_card.dart';
 import '../controller/circle_detail_controller.dart';
 import '../model/circle.dart';
+import '../widget/circle_icon.dart';
 
-/// 圈子详情页（文档 3.4）：封面头图 + 简介 + 加入/退出 + 圈内帖子流（最新）。
+/// 圈子详情页（文档 3.4，视觉对齐发现页新风格）：
+/// 封面头图 + 骑缝白色信息卡（圆形图标/名称/数据/加入按钮）+ 圈内帖子流（最新）。
 class CircleDetailPage extends ConsumerWidget {
   const CircleDetailPage({super.key, required this.circleId});
 
@@ -51,8 +53,8 @@ class _DetailBody extends ConsumerWidget {
     );
 
     return RefreshIndicator(
-      // 下沉留出 AppBar 区域，避免被封面遮挡
-      edgeOffset: 220,
+      // 下沉留出封面区域，避免被遮挡
+      edgeOffset: 180,
       onRefresh: () async {
         try {
           await controller.refresh();
@@ -74,7 +76,19 @@ class _DetailBody extends ConsumerWidget {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            _Header(circle: state.circle, circleId: circleId),
+            _CoverBar(circle: state.circle),
+            SliverToBoxAdapter(
+              child: _InfoCard(circle: state.circle, circleId: circleId),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(20, 6, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  '圈内动态',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
             if (state.posts.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
@@ -86,7 +100,7 @@ class _DetailBody extends ConsumerWidget {
                 sliver: SliverList.separated(
                   itemCount: state.posts.length,
                   separatorBuilder: (context, index) =>
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final post = state.posts[index];
                     return PostCard(
@@ -109,22 +123,24 @@ class _DetailBody extends ConsumerWidget {
   }
 }
 
-/// 折叠头：封面 + 圈子信息 + 加入按钮
-class _Header extends ConsumerWidget {
-  const _Header({required this.circle, required this.circleId});
+/// 折叠封面条：仅封面图 + 渐变压暗，信息移入下方骑缝白卡
+class _CoverBar extends StatelessWidget {
+  const _CoverBar({required this.circle});
 
   final Circle circle;
-  final int circleId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 200,
+      expandedHeight: 176,
       foregroundColor: Colors.white,
       backgroundColor: scheme.primary,
-      title: Text(circle.name),
+      title: Text(
+        circle.name,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -138,90 +154,138 @@ class _Header extends ConsumerWidget {
               )
             else
               Container(color: scheme.primary),
-            // 底部渐变压暗保证文字可读
+            // 顶部轻压暗保证返回键可见，底部留给白卡骑缝
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black54],
+                  colors: [Colors.black26, Colors.transparent],
                 ),
               ),
             ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 14,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                circle.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 骑缝白色信息卡：圆形图标 + 名称/官方标 + 数据 + 简介 + 加入按钮
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.circle, required this.circleId});
+
+  final Circle circle;
+  final int circleId;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Transform.translate(
+      offset: const Offset(0, -22),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1F2430).withValues(alpha: .06),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 白圈描边的圆形图标
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFECEDF2),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: CircleIconAvatar(circle: circle, size: 52),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              circle.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (circle.isOfficial) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: PostCard.brandGradient,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                '官方',
+                                style: TextStyle(
+                                  fontSize: 9.5,
                                   color: Colors.white,
-                                  fontSize: 20,
                                   fontWeight: FontWeight.w700,
+                                  height: 1.2,
                                 ),
                               ),
                             ),
-                            if (circle.isOfficial) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 1.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: .25),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  '官方',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${formatCount(circle.memberCount)} 成员 · ${formatCount(circle.postCount)} 帖子',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.outline,
+                          fontWeight: FontWeight.w500,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${formatCount(circle.memberCount)} 成员 · ${formatCount(circle.postCount)} 帖子',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          circle.intro,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  _JoinButton(circleId: circleId),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                _JoinButton(circleId: circleId),
+              ],
             ),
+            if (circle.intro.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                circle.intro,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.5,
+                  color: scheme.onSurfaceVariant.withValues(alpha: .9),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -240,38 +304,55 @@ class _JoinButton extends ConsumerWidget {
     if (state == null) return const SizedBox.shrink();
     final joined = state.circle.joined;
 
+    Future<void> toggle() async {
+      try {
+        await ref
+            .read(circleDetailControllerProvider(circleId).notifier)
+            .toggleJoin();
+      } on ApiException catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(e.message)));
+        }
+      }
+    }
+
+    final Widget child = state.joinBusy
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Text(joined ? '已加入' : '+ 加入');
+
+    if (joined) {
+      return OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(78, 34),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          visualDensity: VisualDensity.compact,
+          foregroundColor: Theme.of(context).colorScheme.outline,
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          textStyle: const TextStyle(fontSize: 13),
+        ),
+        onPressed: state.joinBusy ? null : toggle,
+        child: child,
+      );
+    }
     return FilledButton(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(88, 36),
-        backgroundColor: joined
-            ? Colors.white.withValues(alpha: .25)
-            : Colors.white,
-        foregroundColor: joined
-            ? Colors.white
-            : Theme.of(context).colorScheme.primary,
+        minimumSize: const Size(78, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
-      onPressed: state.joinBusy
-          ? null
-          : () async {
-              try {
-                await ref
-                    .read(circleDetailControllerProvider(circleId).notifier)
-                    .toggleJoin();
-              } on ApiException catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(content: Text(e.message)));
-                }
-              }
-            },
-      child: state.joinBusy
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Text(joined ? '已加入' : '+ 加入'),
+      onPressed: state.joinBusy ? null : toggle,
+      child: child,
     );
   }
 }

@@ -416,7 +416,29 @@ type AdminLoginResp struct {
 	ExpireAt      int64    `json:"expireAt"`
 	Username      string   `json:"username"`
 	Perms         []string `json:"perms"`
-	MustChangePwd bool     `json:"mustChangePwd"` // true=首登/重置后必须先改密
+	MustChangePwd bool     `json:"mustChangePwd"`          // true=首登/重置后必须先改密
+	TotpRequired  bool     `json:"totpRequired,omitempty"` // true=还需二步验证,用 ticket 换 token
+	Ticket        string   `json:"ticket,omitempty"`       // 二步验证临时票据(5 分钟)
+}
+
+type AdminTotpLoginReq struct {
+	Ticket string `json:"ticket"`
+	Code   string `json:"code"` // 6 位动态口令或恢复码
+}
+
+type TotpSetupResp struct {
+	Secret        string   `json:"secret"`        // base32,手动录入用
+	URI           string   `json:"uri"`           // otpauth://,验证器扫码导入
+	RecoveryCodes []string `json:"recoveryCodes"` // 明文仅此一次,库中只存哈希
+}
+
+type TotpCodeReq struct {
+	Code string `json:"code"`
+}
+
+type TotpStatusResp struct {
+	Enabled           bool  `json:"enabled"`
+	RecoveryCodesLeft int64 `json:"recoveryCodesLeft"`
 }
 
 type CaptchaResp struct {
@@ -450,6 +472,7 @@ type AdminUpdateAccountReq struct {
 	RoleID      int64  `json:"roleId,optional"`      // >0 调整角色
 	Status      int64  `json:"status,optional,options=0|1|-1,default=-1"` // -1 不改
 	NewPassword string `json:"newPassword,optional"` // 非空=重置密码并强制改密
+	ResetTotp   bool   `json:"resetTotp,optional"`   // true=强制解绑二步验证(丢失验证器场景)
 }
 
 type AdminRoleItem struct {
@@ -582,6 +605,20 @@ type AdminTaskSaveReq struct {
 	RewardExp    int64  `json:"rewardExp,optional"`
 	Sort         int64  `json:"sort,optional"`
 	Status       int64  `json:"status,optional,options=0|1,default=1"`
+}
+
+// ---- 对象存储直传 ----
+
+type PresignReq struct {
+	Kind     string `json:"kind,options=avatar|cover|post|software|apk"` // 用途决定目录/大小/类型限制
+	FileName string `json:"fileName"`
+	Size     int64  `json:"size"` // 字节,用于服务端预校验
+}
+
+type PresignResp struct {
+	UploadURL string `json:"uploadUrl"` // 客户端对此 URL 发 PUT(body=文件原文)
+	FileURL   string `json:"fileUrl"`   // 上传成功后落库/展示的公开地址
+	ExpireAt  int64  `json:"expireAt"`  // 签名过期时间(毫秒)
 }
 
 type TrendReq struct {
