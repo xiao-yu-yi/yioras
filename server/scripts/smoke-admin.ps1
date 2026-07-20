@@ -382,6 +382,11 @@ Invoke-RestMethod -Method Put -Uri "$api/user/settings" -Headers $h2 -ContentTyp
 $setBack = (Invoke-RestMethod "$api/user/settings" -Headers $h2).data
 Write-Output "[12.39] prefOff read=$($setRead.pushInteract) (expect False) dmStillOn=$($setRead.pushDm) (expect True); likeWhileOff count=$pushCnt3 (expect 2, unchanged); restored=$($setBack.pushInteract) (expect True)"
 
+# 12.40 push channel dashboard: mock channel counted the sends made in 12.37/12.38
+$pstats = (Invoke-RestMethod "$adm/push/stats?days=7" -Headers $ha).data
+$mockCh = @($pstats.channels | Where-Object { $_.channel -eq 'mock' })[0]
+Write-Output "[12.40] pushStats channels=$($pstats.channels.Count) mockOk=$($mockCh.ok) (expect >=2) mockFail=$($mockCh.fail) (expect 0)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

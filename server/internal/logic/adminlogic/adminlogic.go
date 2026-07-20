@@ -18,6 +18,7 @@ import (
 	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/logic/userlogic"
 	"github.com/yiora/server/internal/model"
+	"github.com/yiora/server/internal/pkg/apppush"
 	"github.com/yiora/server/internal/pkg/captcha"
 	"github.com/yiora/server/internal/pkg/jwtx"
 	"github.com/yiora/server/internal/pkg/totp"
@@ -750,6 +751,36 @@ func (l *Logic) PublishNotice(ctx context.Context, adminID int64, req *types.Adm
 // Agreement 协议内容(用户侧/后台共用读取)。
 // agreementKinds 协议/静态文案合法类型;bot_prompt 为管家 LLM 系统提示词(仅后台可读写,用户侧接口拒绝)。
 var agreementKinds = map[string]bool{"user": true, "privacy": true, "bot_prompt": true}
+
+// PushStats 推送渠道看板:各渠道发送/失败日计数(apppush.Manager 写入)。
+func (l *Logic) PushStats(ctx context.Context, days int) (*types.PushStatsResp, error) {
+	out := &types.PushStatsResp{Channels: []types.PushChannelStat{}}
+	getN := func(key string) int64 {
+		v, err := l.svcCtx.Redis.GetCtx(ctx, key)
+		if err != nil || v == "" {
+			return 0
+		}
+		n, _ := strconv.ParseInt(v, 10, 64)
+		return n
+	}
+	for _, ch := range l.svcCtx.AppPush.Channels() {
+		stat := types.PushChannelStat{Channel: ch}
+		for i := days - 1; i >= 0; i-- {
+			day := time.Now().AddDate(0, 0, -i)
+			ok := getN(apppush.StatKey(ch, "ok", day.Format("20060102")))
+			fail := getN(apppush.StatKey(ch, "fail", day.Format("20060102")))
+			stat.OK += ok
+			stat.Fail += fail
+			stat.Days = append(stat.Days, struct {
+				Date string `json:"date"`
+				OK   int64  `json:"ok"`
+				Fail int64  `json:"fail"`
+			}{Date: day.Format("2006-01-02"), OK: ok, Fail: fail})
+		}
+		out.Channels = append(out.Channels, stat)
+	}
+	return out, nil
+}
 
 // BotStats 管家应答命中来源统计(Redis 按日计数,imlogic.botReply 写入)。
 func (l *Logic) BotStats(ctx context.Context, days int) (*types.BotStatsResp, error) {

@@ -178,6 +178,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodDelete, Path: "/banners/:id", Handler: adminDeleteBannerHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/dashboard", Handler: adminDashboardHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/dashboard/trend", Handler: adminTrendHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/push/stats", Handler: adminPushStatsHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/software/categories", Handler: adminCategoriesHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/software/categories", Handler: adminSaveCategoryHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/words", Handler: adminWordsHandler(svcCtx)},

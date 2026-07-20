@@ -320,6 +320,12 @@ export const api = {
   // AI 管家应答来源统计
   botStats: (days = 7) =>
     http.get('/bot/stats', { params: { days } }) as Promise<{ days: { date: string; faq: number; llm: number; fallback: number }[] }>,
+
+  // 推送渠道看板
+  pushStats: (days = 7) =>
+    http.get('/push/stats', { params: { days } }) as Promise<{
+      channels: { channel: string; ok: number; fail: number; days: { date: string; ok: number; fail: number }[] }[]
+    }>,
 }
 
 export interface AdminCircleItem {

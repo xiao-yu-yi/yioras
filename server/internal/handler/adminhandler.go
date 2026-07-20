@@ -584,6 +584,22 @@ func adminDeleteWordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminPushStatsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "dashboard", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.PushStatsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).PushStats(r.Context(), req.Days)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
 func adminBotStatsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "ops.notice", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
 		var req types.BotStatsReq

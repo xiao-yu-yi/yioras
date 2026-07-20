@@ -130,6 +130,27 @@ type BotStatsResp struct {
 	Days []BotStatDay `json:"days"`
 }
 
+// ---- 推送渠道看板 ----
+
+type PushStatsReq struct {
+	Days int `form:"days,default=7,range=[1:30]"`
+}
+
+type PushChannelStat struct {
+	Channel string `json:"channel"`
+	OK      int64  `json:"ok"`
+	Fail    int64  `json:"fail"`
+	Days    []struct {
+		Date string `json:"date"`
+		OK   int64  `json:"ok"`
+		Fail int64  `json:"fail"`
+	} `json:"days"`
+}
+
+type PushStatsResp struct {
+	Channels []PushChannelStat `json:"channels"`
+}
+
 // ---- 搜索联想 ----
 
 type SuggestReq struct {

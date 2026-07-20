@@ -48,6 +48,35 @@
       </template>
       <div ref="chartEl" class="chart" />
     </el-card>
+
+    <!-- 推送渠道(离线推送发送量/失败率,apppush 渠道计数) -->
+    <el-card v-if="pushStats.length" class="chart-card">
+      <template #header>
+        <div class="chart-bar">
+          <span>推送渠道(近 7 日)</span>
+          <span class="push-hint">离线推送各系统级通道健康度;未配置渠道不显示</span>
+        </div>
+      </template>
+      <el-table :data="pushStats" size="small">
+        <el-table-column prop="channel" label="渠道" width="140">
+          <template #default="{ row }">
+            <el-tag size="small">{{ row.channel }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="ok" label="发送成功" width="120" />
+        <el-table-column prop="fail" label="失败" width="120" />
+        <el-table-column label="失败率" width="120">
+          <template #default="{ row }">
+            <span :class="{ 'fail-high': failRate(row) >= 5 }">{{ failRate(row).toFixed(1) }}%</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="每日走势" min-width="200">
+          <template #default="{ row }">
+            <span class="spark">{{ row.days.map((d: { ok: number }) => d.ok).join(' / ') }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -72,6 +101,19 @@ const loading = ref(false)
 const days = ref(30)
 const chartEl = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
+
+interface PushChannelStat {
+  channel: string
+  ok: number
+  fail: number
+  days: { date: string; ok: number; fail: number }[]
+}
+const pushStats = ref<PushChannelStat[]>([])
+
+function failRate(row: PushChannelStat) {
+  const total = row.ok + row.fail
+  return total === 0 ? 0 : (row.fail / total) * 100
+}
 
 const greeting = computed(() => {
   const h = new Date().getHours()
@@ -174,6 +216,7 @@ onMounted(async () => {
   try {
     data.value = await api.dashboard()
     await loadTrend()
+    pushStats.value = (await api.pushStats(7)).channels
     window.addEventListener('resize', onResize)
   } finally {
     loading.value = false
@@ -221,6 +264,20 @@ onBeforeUnmount(() => {
 }
 .hello-actions {
   margin-left: auto;
+}
+.push-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--el-text-color-secondary);
+}
+.fail-high {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+.spark {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  letter-spacing: 0.5px;
 }
 .col {
   margin-bottom: 16px;

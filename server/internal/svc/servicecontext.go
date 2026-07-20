@@ -134,7 +134,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		searcher = meiliClient
 	}
 	rds := redis.MustNewRedis(c.Redis)
-	pushMgr := apppush.NewManager()
+	pushMgr := apppush.NewManager(rds)
 	if c.Push.Mock {
 		pushMgr.Register("mock", apppush.NewMock(rds))
 	}
