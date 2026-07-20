@@ -42,12 +42,22 @@ Write-Output "[4] balance=$($acct.balance) signedToday=$($acct.signedToday) logs
 $diff = (docker compose exec -T mysql sh -c "mysql -uroot -proot123 yiora -N -e 'SELECT COUNT(1) FROM youzhu_account a LEFT JOIN (SELECT user_id, SUM(amount) s FROM youzhu_log GROUP BY user_id) l ON l.user_id=a.user_id WHERE a.balance != COALESCE(l.s,0)' 2>/dev/null" | Out-String).Trim()
 Write-Output "[5] reconcile mismatch rows=$diff (expect 0)"
 
-# 6. search 5 types + LIKE escape + empty kw
+# 6. search 5 types + LIKE escape + empty kw (meili sync interval is 3s in compose, wait for docs to land)
+Start-Sleep -Seconds 5
 $sp = (Invoke-RestMethod "$api/search?type=post&kw=task").data
 $su = (Invoke-RestMethod "$api/search?type=user&kw=Alice").data
 $ss = (Invoke-RestMethod "$api/search?type=software&kw=Toolbox").data
 $esc = (Invoke-RestMethod "$api/search?type=post&kw=%25%25").data
 $bad = Invoke-RestMethod "$api/search?type=post&kw="
 Write-Output "[6] search post=$($sp.posts.Count) user=$($su.users.Count) software=$($ss.software.Count); escape=$($esc.posts.Count)(expect 0) emptyKw=code$($bad.code)"
+
+# 7. meili chinese tokenization: title "lv-se-mian-fei-ruan-jian-tui-jian" must be hit by query "lv-se-ruan-jian"
+#    (non-contiguous substring: LIKE returns 0, jieba tokenizer matches) -- strings shipped as base64 to keep script ASCII
+$zhTitle = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("57u/6Imy5YWN6LS56L2v5Lu25o6o6I2Q"))
+$zhKw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("57u/6Imy6L2v5Lu2"))
+$zhPost = PostJson "$api/posts" @{circleId = 2; title = $zhTitle; content = "tokenizer case body"} $h2
+Start-Sleep -Seconds 6
+$zhHits = (Invoke-RestMethod ("$api/search?type=post&kw=" + [uri]::EscapeDataString($zhKw))).data
+Write-Output "[7] zhPost=code$($zhPost.code) tokenizedHits=$($zhHits.posts.Count) (expect >=1; LIKE would give 0)"
 
 Write-Output "M3_SMOKE_DONE"

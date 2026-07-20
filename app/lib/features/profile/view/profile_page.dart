@@ -201,7 +201,7 @@ class _ProfileHeader extends ConsumerWidget {
                 label: '忧珠资产',
                 background: const Color(0xFF273043),
                 foreground: Colors.white,
-                onTap: () => _comingSoon(context, '忧珠资产', suffix: '将在 M3 开放'),
+                onTap: () => context.push(Routes.youzhu),
               ),
               const SizedBox(width: 8),
               _PillButton(
@@ -464,16 +464,8 @@ class _StatItem extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: InkWell(
-        onTap: highlight
-            ? () {
-                // 忧珠资产页属 M3（忧珠账户与流水）
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    const SnackBar(content: Text('「忧珠资产」将在 M3 开放')),
-                  );
-              }
-            : null,
+        // 忧珠数据项 → 忧珠资产页（余额 + 流水）
+        onTap: highlight ? () => context.push(Routes.youzhu) : null,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),

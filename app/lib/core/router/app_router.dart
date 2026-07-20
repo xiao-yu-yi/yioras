@@ -10,6 +10,8 @@ import '../../features/chat/view/chat_page.dart';
 import '../../features/circle/view/circle_detail_page.dart';
 import '../../features/circle/view/circle_discover_page.dart';
 import '../../features/feed/view/feed_page.dart';
+import '../../features/growth/view/task_center_page.dart';
+import '../../features/growth/view/youzhu_page.dart';
 import '../../features/messages/model/message_models.dart';
 import '../../features/messages/view/messages_page.dart';
 import '../../features/messages/view/notifications_page.dart';
@@ -22,6 +24,7 @@ import '../../features/publish/view/publish_software_page.dart';
 import '../../features/search/view/search_page.dart';
 import '../../features/shell/main_shell.dart';
 import '../../features/software/view/software_detail_page.dart';
+import '../../features/topic/view/topic_posts_page.dart';
 import '../../features/user/view/user_profile_page.dart';
 import 'routes.dart';
 
@@ -94,6 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: Routes.topicPosts,
+        builder: (context, state) =>
+            TopicPostsPage(topicId: int.parse(state.pathParameters['id']!)),
+      ),
+      GoRoute(
         path: Routes.search,
         builder: (context, state) => const SearchPage(),
       ),
@@ -122,6 +130,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: Routes.taskCenter,
+        builder: (context, state) => const TaskCenterPage(),
+      ),
+      GoRoute(
+        path: Routes.youzhu,
+        builder: (context, state) => const YouzhuPage(),
       ),
       // 底部 Tab 主壳：IndexedStack 保活各分支浏览位置
       StatefulShellRoute.indexedStack(

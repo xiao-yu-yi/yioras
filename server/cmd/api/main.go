@@ -31,6 +31,13 @@ func main() {
 	handler.RegisterHandlers(server, svcCtx)
 
 	go reconcileDaemon(svcCtx)
+	if svcCtx.Meili != nil {
+		interval := time.Duration(c.Search.SyncIntervalSec) * time.Second
+		if interval <= 0 {
+			interval = time.Minute
+		}
+		go svcCtx.Meili.SyncDaemon(interval)
+	}
 
 	server.Start()
 }

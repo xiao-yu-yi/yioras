@@ -41,3 +41,7 @@ Storage:
 
 ImgScan:
   Provider: mock # 图片机审:空=关闭 mock=联调(URL 含 mock-review/mock-block 触发) tencent=二期云机审
+
+Search:
+  Provider: mysql # mysql=LIKE;meili=中文分词引擎(需配 Host/APIKey,compose 内为 http://meili:7700)
+  SyncIntervalSec: 60

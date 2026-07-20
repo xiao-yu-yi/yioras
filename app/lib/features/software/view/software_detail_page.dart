@@ -9,6 +9,7 @@ import '../../../core/router/routes.dart';
 import '../../../core/utils/time_format.dart';
 import '../data/software_repository.dart';
 import '../model/software.dart';
+import 'software_comments_section.dart';
 
 /// 软件详情数据源（family：软件 ID）
 final softwareDetailProvider = FutureProvider.autoDispose
@@ -113,6 +114,9 @@ class _DetailBody extends ConsumerWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: 10),
+              // 评论区（文档 3.6）
+              SoftwareCommentsSection(softwareId: item.id),
               // 免责声明（文档 3.6 安全提示）
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 14, 4, 0),

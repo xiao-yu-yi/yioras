@@ -53,4 +53,11 @@ type Config struct {
 	ImgScan struct {
 		Provider string `json:",optional"` // ""=关闭 mock=联调冒烟 tencent/aliyun=二期云机审
 	} `json:",optional"`
+
+	Search struct {
+		Provider        string `json:",default=mysql,options=mysql|meili"` // meili 需配 Host
+		Host            string `json:",optional"`                          // 如 http://meili:7700
+		APIKey          string `json:",optional"`                          // MEILI_MASTER_KEY
+		SyncIntervalSec int    `json:",default=60"`                        // 增量同步周期
+	} `json:",optional"`
 }

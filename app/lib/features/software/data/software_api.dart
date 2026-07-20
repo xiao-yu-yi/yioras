@@ -62,6 +62,20 @@ class SoftwareApi {
     ).unwrap();
   }
 
+  /// GET /software/mine 我的发布（含审核状态，登录态）
+  Future<List<SoftwareItem>> fetchMine({int page = 1, int size = 20}) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/software/mine',
+      queryParameters: {'page': page, 'size': size},
+    );
+    return ApiResponse.fromJson(
+      resp.data!,
+      (data) => (data as List<dynamic>? ?? const [])
+          .map((e) => SoftwareItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ).unwrap();
+  }
+
   /// GET /software/categories?type= 分类（data 为 CategoryItem 数组）
   Future<List<SoftwareCategory>> fetchCategories(int type) async {
     final resp = await _dio.get<Map<String, dynamic>>(

@@ -77,6 +77,10 @@ services:
       YIORA_S3_ACCESS_KEY: ${YIORA_S3_ACCESS_KEY:-}
       YIORA_S3_SECRET_KEY: ${YIORA_S3_SECRET_KEY:-}
       YIORA_IMGSCAN_PROVIDER: ${YIORA_IMGSCAN_PROVIDER:-}
+      # 搜索引擎:默认 mysql LIKE;上 meili 时改 provider 并补 host/key(自建 meili 服务后)
+      YIORA_SEARCH_PROVIDER: ${YIORA_SEARCH_PROVIDER:-mysql}
+      YIORA_MEILI_HOST: ${YIORA_MEILI_HOST:-}
+      YIORA_MEILI_KEY: ${YIORA_MEILI_KEY:-}
     depends_on:
       mysql:
         condition: service_healthy

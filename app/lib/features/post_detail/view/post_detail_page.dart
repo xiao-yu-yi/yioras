@@ -11,6 +11,7 @@ import '../../feed/model/post.dart';
 import '../../feed/widget/post_card.dart' show PostCard;
 import '../../report/data/report_repository.dart';
 import '../../report/widget/report_sheet.dart';
+import '../../topic/view/topic_posts_page.dart' show openTopicByName;
 import '../../user/controller/follow_controller.dart';
 import '../controller/post_detail_controller.dart';
 import '../model/post_detail.dart';
@@ -551,38 +552,42 @@ class _ImageGrid extends StatelessWidget {
   }
 }
 
-class _TopicChip extends StatelessWidget {
+/// 话题胶囊：点按进话题聚合页（按名解析 ID）
+class _TopicChip extends ConsumerWidget {
   const _TopicChip({required this.name});
 
   final String name;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: .07),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '# ',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: scheme.primary.withValues(alpha: .8),
-              ),
-            ),
-            TextSpan(text: name),
-          ],
+    return GestureDetector(
+      onTap: () => openTopicByName(context, ref, name),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: scheme.primary.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(999),
         ),
-        style: TextStyle(
-          fontSize: 12,
-          color: scheme.primary,
-          fontWeight: FontWeight.w500,
-          height: 1.2,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '# ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: scheme.primary.withValues(alpha: .8),
+                ),
+              ),
+              TextSpan(text: name),
+            ],
+          ),
+          style: TextStyle(
+            fontSize: 12,
+            color: scheme.primary,
+            fontWeight: FontWeight.w500,
+            height: 1.2,
+          ),
         ),
       ),
     );

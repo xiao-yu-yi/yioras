@@ -22,7 +22,8 @@ type ServiceContext struct {
 	Email  *emailx.Sender
 	Pusher *wspush.Pusher    // api → ws 网关内部下行推送
 	Filter *sensitive.Filter // 发布/评论/私信共用的敏感词机审
-	Search search.Searcher   // 全站搜索,当前 MySQL LIKE,可换 Meilisearch
+	Search search.Searcher   // 全站搜索:mysql(LIKE)或 meili 驱动,配置切换
+	Meili  *search.Meili     // 非 nil 时 api 进程负责起增量同步 daemon
 	AdminIPs *ipallow.List   // 后台访问 IP 白名单(启动时解析)
 	ImgScanner imgscan.Scanner // 图片机审驱动,nil=关闭(直传后异步送审)
 	Multipart *multipart.Client // S3 分片上传(APK 大文件),nil=对象存储未配置
@@ -72,12 +73,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			logx.Must(err)
 		}
 	}
+	searchModel := model.NewSearchModel(conn)
+	var searcher search.Searcher = searchModel
+	var meiliClient *search.Meili
+	if c.Search.Provider == "meili" {
+		meiliClient, err = search.NewMeili(c.Search.Host, c.Search.APIKey, searchModel)
+		if err != nil {
+			logx.Must(err) // 显式选择 meili 却连不上,宁可起不来,不能静默退化
+		}
+		searcher = meiliClient
+	}
 	return &ServiceContext{
 		Config: c,
 		Redis:  redis.MustNewRedis(c.Redis),
 		AdminIPs: adminIPs,
 		ImgScanner: scanner,
 		Multipart: mpClient,
+		Meili: meiliClient,
 		Email: emailx.NewSender(emailx.Config{
 			Host: c.Email.Host, Port: c.Email.Port,
 			Username: c.Email.Username, Password: c.Email.Password,
@@ -85,7 +97,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		}),
 		Pusher: wspush.New(c.WsPush.URL, c.WsPush.Token),
 		Filter: sensitive.NewFilter(sensitiveModel),
-		Search: model.NewSearchModel(conn),
+		Search: searcher,
 
 		UserModel:      model.NewUserModel(conn),
 		CircleModel:    model.NewCircleModel(conn),

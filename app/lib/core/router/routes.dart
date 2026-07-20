@@ -16,18 +16,24 @@ abstract final class Routes {
   static const publishSoftware = '/publish/software';
   static const postDetail = '/posts/:id';
   static const softwareDetail = '/software/:id';
+  static const topicPosts = '/topics/:id';
   static const search = '/search';
   static const notifications = '/notifications/:type';
   static const chat = '/chat/:id';
   static const userProfile = '/users/:id';
   static const settings = '/settings';
   static const editProfile = '/settings/profile';
+  static const taskCenter = '/tasks';
+  static const youzhu = '/youzhu';
+  static const myPublications = '/my-publications';
 
   static String circleDetailPath(int id) => '/circles/$id';
 
   static String postDetailPath(int id) => '/posts/$id';
 
   static String softwareDetailPath(int id) => '/software/$id';
+
+  static String topicPostsPath(int id) => '/topics/$id';
 
   static String chatPath(int conversationId) => '/chat/$conversationId';
 

@@ -30,6 +30,9 @@ abstract interface class SoftwareRepository {
   Future<SoftwareDownload> resolveDownload(int id, {int versionId});
 
   Future<List<SoftwareCategory>> fetchCategories(int type);
+
+  /// 我的发布（含审核状态：0 待审核 / 1 已上架 / 2 驳回 / 3 下架）
+  Future<SoftwarePage> fetchMine({int page, int size});
 }
 
 class SoftwareRepositoryHttp implements SoftwareRepository {
@@ -66,6 +69,13 @@ class SoftwareRepositoryHttp implements SoftwareRepository {
   @override
   Future<List<SoftwareCategory>> fetchCategories(int type) =>
       _guard(() => _api.fetchCategories(type));
+
+  @override
+  Future<SoftwarePage> fetchMine({int page = 1, int size = 20}) =>
+      _guard(() async {
+        final list = await _api.fetchMine(page: page, size: size);
+        return SoftwarePage(list: list, hasMore: list.length >= size);
+      });
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
@@ -254,6 +264,56 @@ class SoftwareRepositoryMock implements SoftwareRepository {
       2 => _gameCategories,
       _ => [..._appCategories, ..._gameCategories],
     };
+  }
+
+  @override
+  Future<SoftwarePage> fetchMine({int page = 1, int size = 20}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (page > 1) return const SoftwarePage(list: [], hasMore: false);
+    // 演示各审核状态：待审核 / 已上架 / 驳回 / 下架
+    final mine = [
+      SoftwareItem(
+        id: 9001,
+        name: '云梦笔记（新提交）',
+        logo: 'https://picsum.photos/seed/yiora-mine-0/144/144',
+        intro: '刚提交的新软件，等待审核上架',
+        type: 1,
+        categoryId: 1,
+        tags: const ['自制'],
+        version: '1.0.0',
+        size: '22MB',
+        status: 0,
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
+      _items.first,
+      SoftwareItem(
+        id: 9002,
+        name: '极速抢票助手',
+        logo: 'https://picsum.photos/seed/yiora-mine-1/144/144',
+        intro: '因违反平台规范被驳回，可修改后重新提交',
+        type: 1,
+        categoryId: 5,
+        tags: const [],
+        version: '0.9.1',
+        size: '17MB',
+        status: 2,
+        createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      ),
+      SoftwareItem(
+        id: 9003,
+        name: '旧版影音盒子',
+        logo: 'https://picsum.photos/seed/yiora-mine-2/144/144',
+        intro: '因版权方投诉已下架',
+        type: 1,
+        categoryId: 2,
+        tags: const [],
+        version: '3.4.0',
+        size: '48MB',
+        status: 3,
+        createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+    ];
+    return SoftwarePage(list: mine, hasMore: false);
   }
 }
 

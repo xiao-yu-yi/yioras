@@ -463,9 +463,7 @@ class _TopicTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return _TileCard(
-      onTap: () => ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('话题聚合页正在开发中，敬请期待'))),
+      onTap: () => context.push(Routes.topicPostsPath(item.id)),
       child: Row(
         children: [
           Container(

@@ -78,6 +78,18 @@ services:
       mc mb -p local/yiora &&
       mc anonymous set download local/yiora || true"
 
+  # 全站搜索引擎(中文分词/错字容忍),api 侧 Search.Provider=meili 时启用
+  meili:
+    image: getmeili/meilisearch:v1.15
+    environment:
+      MEILI_MASTER_KEY: compose-dev-meili-key
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili-data:/meili_data
+    restart: unless-stopped
+
   api:
     build: .
     command: ["/app/yiora-api", "-f", "etc/docker/yiora-api.yaml"]
@@ -88,6 +100,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      meili:
+        condition: service_started # api 内建 30s 健康重试,无需镜像级 healthcheck
     restart: unless-stopped
 
   ws:
@@ -100,3 +114,4 @@ services:
 volumes:
   mysql-data:
   minio-data:
+  meili-data:

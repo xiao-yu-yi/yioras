@@ -88,3 +88,216 @@ func (m *SearchModel) SearchTopics(ctx context.Context, kw string, offset, limit
 	}
 	return rows, nil
 }
+
+// ---- Meilisearch 同步:增量拉取(索引文档) + 按 ID 保序回表 ----
+
+// IndexDoc 送入搜索引擎的轻文档(检索字段+过滤字段+排序字段)。
+type IndexDoc = map[string]any
+
+const pullBatch = 5000
+
+// PullPostDocs 帖子增量:updated_at 水位,全状态入索引(下架/删除靠查询侧 status 过滤隐藏)。
+func (m *SearchModel) PullPostDocs(ctx context.Context, since string) ([]IndexDoc, string, error) {
+	var rows []struct {
+		ID         int64  `db:"id"`
+		Title      string `db:"title"`
+		Content    string `db:"content"`
+		Status     int64  `db:"status"`
+		Visibility int64  `db:"visibility"`
+		HotScore   int64  `db:"hot_score"`
+		UpdatedAt  string `db:"updated_at"`
+	}
+	err := m.conn.QueryRowsCtx(ctx, &rows,
+		"SELECT id, title, content, status, visibility, hot_score, DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s.%f') AS updated_at FROM `post` WHERE updated_at > ? ORDER BY updated_at LIMIT ?",
+		since, pullBatch)
+	if err != nil {
+		return nil, since, err
+	}
+	docs := make([]IndexDoc, 0, len(rows))
+	next := since
+	for _, r := range rows {
+		docs = append(docs, IndexDoc{
+			"id": r.ID, "title": r.Title, "content": r.Content,
+			"status": r.Status, "visibility": r.Visibility, "hotScore": r.HotScore,
+		})
+		next = r.UpdatedAt
+	}
+	return docs, next, nil
+}
+
+// PullUserDocs 用户增量:updated_at 水位。
+func (m *SearchModel) PullUserDocs(ctx context.Context, since string) ([]IndexDoc, string, error) {
+	var rows []struct {
+		ID        int64  `db:"id"`
+		Nickname  string `db:"nickname"`
+		DisplayNo string `db:"display_no"`
+		Level     int64  `db:"level"`
+		Status    int64  `db:"status"`
+		UpdatedAt string `db:"updated_at"`
+	}
+	err := m.conn.QueryRowsCtx(ctx, &rows,
+		"SELECT id, nickname, COALESCE(display_no, '') AS display_no, level, status, DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s.%f') AS updated_at FROM `user` WHERE updated_at > ? ORDER BY updated_at LIMIT ?",
+		since, pullBatch)
+	if err != nil {
+		return nil, since, err
+	}
+	docs := make([]IndexDoc, 0, len(rows))
+	next := since
+	for _, r := range rows {
+		docs = append(docs, IndexDoc{
+			"id": r.ID, "nickname": r.Nickname, "displayNo": r.DisplayNo,
+			"level": r.Level, "status": r.Status,
+		})
+		next = r.UpdatedAt
+	}
+	return docs, next, nil
+}
+
+// PullCircleDocs / PullSoftwareDocs / PullTopicDocs 运营实体表(千级)每轮全量 upsert。
+func (m *SearchModel) PullCircleDocs(ctx context.Context) ([]IndexDoc, error) {
+	var rows []struct {
+		ID       int64  `db:"id"`
+		Name     string `db:"name"`
+		Intro    string `db:"intro"`
+		Status   int64  `db:"status"`
+		HotScore int64  `db:"hot_score"`
+	}
+	if err := m.conn.QueryRowsCtx(ctx, &rows,
+		"SELECT id, name, intro, status, hot_score FROM `circle` LIMIT ?", pullBatch); err != nil {
+		return nil, err
+	}
+	docs := make([]IndexDoc, 0, len(rows))
+	for _, r := range rows {
+		docs = append(docs, IndexDoc{"id": r.ID, "name": r.Name, "intro": r.Intro, "status": r.Status, "hotScore": r.HotScore})
+	}
+	return docs, nil
+}
+
+func (m *SearchModel) PullSoftwareDocs(ctx context.Context) ([]IndexDoc, error) {
+	var rows []struct {
+		ID            int64  `db:"id"`
+		Name          string `db:"name"`
+		Intro         string `db:"intro"`
+		Status        int64  `db:"status"`
+		DownloadCount int64  `db:"download_count"`
+	}
+	if err := m.conn.QueryRowsCtx(ctx, &rows,
+		"SELECT id, name, intro, status, download_count FROM `software` LIMIT ?", pullBatch); err != nil {
+		return nil, err
+	}
+	docs := make([]IndexDoc, 0, len(rows))
+	for _, r := range rows {
+		docs = append(docs, IndexDoc{"id": r.ID, "name": r.Name, "intro": r.Intro, "status": r.Status, "downloadCount": r.DownloadCount})
+	}
+	return docs, nil
+}
+
+func (m *SearchModel) PullTopicDocs(ctx context.Context) ([]IndexDoc, error) {
+	var rows []struct {
+		ID        int64  `db:"id"`
+		Name      string `db:"name"`
+		Status    int64  `db:"status"`
+		HotScore  int64  `db:"hot_score"`
+		PostCount int64  `db:"post_count"`
+	}
+	if err := m.conn.QueryRowsCtx(ctx, &rows,
+		"SELECT id, name, status, hot_score, post_count FROM `topic` LIMIT ?", pullBatch); err != nil {
+		return nil, err
+	}
+	docs := make([]IndexDoc, 0, len(rows))
+	for _, r := range rows {
+		docs = append(docs, IndexDoc{"id": r.ID, "name": r.Name, "status": r.Status, "hotScore": r.HotScore, "postCount": r.PostCount})
+	}
+	return docs, nil
+}
+
+// inPlaceholders 生成 IN (?,?,...) 与参数。
+func inPlaceholders(ids []int64) (string, []any) {
+	ph := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		ph[i], args[i] = "?", id
+	}
+	return strings.Join(ph, ","), args
+}
+
+// PostsByIDs 按 ID 批量回表,返回顺序与 ids 一致(保持引擎相关性排序)。
+func (m *SearchModel) PostsByIDs(ctx context.Context, ids []int64) ([]*Post, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ph, args := inPlaceholders(ids)
+	var rows []*Post
+	q := fmt.Sprintf("SELECT %s FROM `post` WHERE id IN (%s)", postCols, ph)
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, args...); err != nil {
+		return nil, err
+	}
+	return sortByIDs(rows, ids, func(p *Post) int64 { return p.ID }), nil
+}
+
+func (m *SearchModel) UsersByIDs(ctx context.Context, ids []int64) ([]*UserBrief, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ph, args := inPlaceholders(ids)
+	var rows []*UserBrief
+	q := fmt.Sprintf("SELECT id, display_no, nickname, avatar, level FROM `user` WHERE id IN (%s)", ph)
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, args...); err != nil {
+		return nil, err
+	}
+	return sortByIDs(rows, ids, func(u *UserBrief) int64 { return u.ID }), nil
+}
+
+func (m *SearchModel) CirclesByIDs(ctx context.Context, ids []int64) ([]*Circle, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ph, args := inPlaceholders(ids)
+	var rows []*Circle
+	q := fmt.Sprintf("SELECT %s FROM `circle` WHERE id IN (%s)", circleCols, ph)
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, args...); err != nil {
+		return nil, err
+	}
+	return sortByIDs(rows, ids, func(c *Circle) int64 { return c.ID }), nil
+}
+
+func (m *SearchModel) SoftwareByIDs(ctx context.Context, ids []int64) ([]*Software, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ph, args := inPlaceholders(ids)
+	var rows []*Software
+	q := fmt.Sprintf("SELECT %s FROM `software` WHERE id IN (%s)", softwareCols, ph)
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, args...); err != nil {
+		return nil, err
+	}
+	return sortByIDs(rows, ids, func(s *Software) int64 { return s.ID }), nil
+}
+
+func (m *SearchModel) TopicsByIDs(ctx context.Context, ids []int64) ([]*Topic, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ph, args := inPlaceholders(ids)
+	var rows []*Topic
+	q := fmt.Sprintf("SELECT id, name, post_count FROM `topic` WHERE id IN (%s)", ph)
+	if err := m.conn.QueryRowsCtx(ctx, &rows, q, args...); err != nil {
+		return nil, err
+	}
+	return sortByIDs(rows, ids, func(t *Topic) int64 { return t.ID }), nil
+}
+
+// sortByIDs 按给定 ids 顺序重排(引擎按相关性给序,IN 查询乱序返回)。
+func sortByIDs[T any](rows []T, ids []int64, key func(T) int64) []T {
+	byID := make(map[int64]T, len(rows))
+	for _, r := range rows {
+		byID[key(r)] = r
+	}
+	out := make([]T, 0, len(rows))
+	for _, id := range ids {
+		if r, ok := byID[id]; ok {
+			out = append(out, r)
+		}
+	}
+	return out
+}

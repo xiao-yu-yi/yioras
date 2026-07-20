@@ -42,3 +42,9 @@ Storage:
 
 ImgScan:
   Provider: mock # dev/smoke only: URL with mock-review/mock-block triggers verdicts; prod uses tencent (phase 2)
+
+Search:
+  Provider: meili # mysql=LIKE fallback; meili=chinese-tokenized engine (falls back to LIKE per-query on error)
+  Host: http://meili:7700
+  APIKey: compose-dev-meili-key
+  SyncIntervalSec: 3 # dev/smoke: fast sync so tests can assert within seconds; prod uses 60

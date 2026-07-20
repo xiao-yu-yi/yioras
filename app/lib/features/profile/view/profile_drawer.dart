@@ -135,8 +135,10 @@ class ProfileDrawer extends ConsumerWidget {
                     iconColor: const Color(0xFFF59E0B),
                     iconBg: const Color(0xFFFEF4E2),
                     label: '任务中心',
-                    milestone: 'M3',
-                    onTap: () => comingSoon('任务中心', 'M3'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push(Routes.taskCenter);
+                    },
                   ),
                   _DrawerItem(
                     icon: Icons.confirmation_number_outlined,

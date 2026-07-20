@@ -43,3 +43,9 @@ Storage:
 
 ImgScan:
   Provider: ${YIORA_IMGSCAN_PROVIDER} # 图片机审驱动:留空=关闭;tencent/aliyun 二期接入
+
+Search:
+  Provider: ${YIORA_SEARCH_PROVIDER} # mysql(默认 LIKE)或 meili
+  Host: ${YIORA_MEILI_HOST}
+  APIKey: ${YIORA_MEILI_KEY}
+  SyncIntervalSec: 60
