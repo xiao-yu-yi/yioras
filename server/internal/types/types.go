@@ -711,10 +711,10 @@ type AdminCreateAccountReq struct {
 
 type AdminUpdateAccountReq struct {
 	ID          int64  `path:"id"`
-	RoleID      int64  `json:"roleId,optional"`      // >0 调整角色
+	RoleID      int64  `json:"roleId,optional"`                           // >0 调整角色
 	Status      int64  `json:"status,optional,options=0|1|-1,default=-1"` // -1 不改
-	NewPassword string `json:"newPassword,optional"` // 非空=重置密码并强制改密
-	ResetTotp   bool   `json:"resetTotp,optional"`   // true=强制解绑二步验证(丢失验证器场景)
+	NewPassword string `json:"newPassword,optional"`                      // 非空=重置密码并强制改密
+	ResetTotp   bool   `json:"resetTotp,optional"`                        // true=强制解绑二步验证(丢失验证器场景)
 }
 
 type AdminRoleItem struct {
@@ -727,9 +727,9 @@ type AdminRoleItem struct {
 
 type AdminWordListReq struct {
 	Keyword  string `form:"keyword,optional"`
-	Category int64  `form:"category,optional"`  // 0全部 1政治 2色情 3辱骂 4广告 5其他
-	Level    int64  `form:"level,optional"`     // 0全部 1拦截 2人审 3打码
-	Status   int64  `form:"status,default=-1"`  // -1全部 1启用 0停用
+	Category int64  `form:"category,optional"` // 0全部 1政治 2色情 3辱骂 4广告 5其他
+	Level    int64  `form:"level,optional"`    // 0全部 1拦截 2人审 3打码
+	Status   int64  `form:"status,default=-1"` // -1全部 1启用 0停用
 	PageReq
 }
 
@@ -1017,7 +1017,7 @@ type AdminPrettyNoItem struct {
 }
 
 type AdminPrettyNoListResp struct {
-	Total int64              `json:"total"`
+	Total int64               `json:"total"`
 	List  []AdminPrettyNoItem `json:"list"`
 }
 
@@ -1123,7 +1123,7 @@ type UserBanReq struct {
 }
 
 type AdminUserListReq struct {
-	Keyword string `form:"keyword,optional"`            // 昵称/展示编号/邮箱模糊
+	Keyword string `form:"keyword,optional"`                  // 昵称/展示编号/邮箱模糊
 	Status  int64  `form:"status,optional,options=0|1|2|3|4"` // 0全部 1正常 2禁言 3封禁 4已注销
 	PageReq
 }
@@ -1146,9 +1146,9 @@ type AdminUserListResp struct {
 }
 
 type AdminContentListReq struct {
-	Type    int64  `form:"type,options=1|2"`    // 1帖子 2评论
-	Keyword string `form:"keyword,optional"`    // 帖子搜标题/正文,评论搜内容
-	Status  int64  `form:"status,default=-1"`   // -1全部;帖:0待审1发布2驳回3下架4已删;评:0待审1正常2屏蔽
+	Type    int64  `form:"type,options=1|2"`  // 1帖子 2评论
+	Keyword string `form:"keyword,optional"`  // 帖子搜标题/正文,评论搜内容
+	Status  int64  `form:"status,default=-1"` // -1全部;帖:0待审1发布2驳回3下架4已删;评:0待审1正常2屏蔽
 	PageReq
 }
 
@@ -1162,9 +1162,9 @@ type AdminContentItem struct {
 	CircleID   int64  `json:"circleId,omitempty"` // 帖子专属
 	BizType    int64  `json:"bizType,omitempty"`  // 评论专属:1帖子 2软件
 	BizID      int64  `json:"bizId,omitempty"`    // 评论专属
-	IsTop      int64  `json:"isTop"`      // 帖子:首页置顶精选
-	IsEssence  int64  `json:"isEssence"`  // 帖子:加精
-	FirstImage string `json:"firstImage"` // 帖子首图(评论恒空)
+	IsTop      int64  `json:"isTop"`              // 帖子:首页置顶精选
+	IsEssence  int64  `json:"isEssence"`          // 帖子:加精
+	FirstImage string `json:"firstImage"`         // 帖子首图(评论恒空)
 	LikeCount  int64  `json:"likeCount"`
 	ViewCount  int64  `json:"viewCount"` // 评论恒 0
 	CreatedAt  int64  `json:"createdAt"`
@@ -1176,15 +1176,15 @@ type AdminContentListResp struct {
 }
 
 type AdminTakedownReq struct {
-	Type   int64  `json:"type,options=1|2"`   // 1帖子 2评论
+	Type   int64  `json:"type,options=1|2"` // 1帖子 2评论
 	ID     int64  `json:"id"`
 	Action int64  `json:"action,options=0|1"` // 1下架 0恢复
 	Reason string `json:"reason,optional"`    // 下架必填,通知作者
 }
 
 type AdminReportListReq struct {
-	Status     int64 `form:"status,default=0"`      // 0待处理 1已处理 2已驳回 -1全部
-	TargetType int64 `form:"targetType,optional"`   // 0全部 1帖 2评 3用户 4私信 5软件
+	Status     int64 `form:"status,default=0"`    // 0待处理 1已处理 2已驳回 -1全部
+	TargetType int64 `form:"targetType,optional"` // 0全部 1帖 2评 3用户 4私信 5软件
 	PageReq
 }
 

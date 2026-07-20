@@ -572,15 +572,15 @@ func (m *AdminModel) SearchUsers(ctx context.Context, keyword string, status int
 
 // AdminContentRow 后台内容检索行(帖子/评论统一形态,便于前端同表渲染)。
 type AdminContentRow struct {
-	ID        int64     `db:"id"`
-	UserID    int64     `db:"user_id"`
-	Nickname  string    `db:"nickname"`
-	Title     string    `db:"title"`
-	Content   string    `db:"content"`
-	Status    int64     `db:"status"`
-	CircleID  int64     `db:"circle_id"`
-	BizType   int64     `db:"biz_type"`
-	BizID     int64     `db:"biz_id"`
+	ID         int64     `db:"id"`
+	UserID     int64     `db:"user_id"`
+	Nickname   string    `db:"nickname"`
+	Title      string    `db:"title"`
+	Content    string    `db:"content"`
+	Status     int64     `db:"status"`
+	CircleID   int64     `db:"circle_id"`
+	BizType    int64     `db:"biz_type"`
+	BizID      int64     `db:"biz_id"`
 	IsTop      int64     `db:"is_top"`
 	IsEssence  int64     `db:"is_essence"`
 	LikeCount  int64     `db:"like_count"`

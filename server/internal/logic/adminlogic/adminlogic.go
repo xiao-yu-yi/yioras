@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yiora/server/internal/logic/authlogic"
 	"github.com/yiora/server/internal/logic/uploadlogic"
 	"github.com/yiora/server/internal/logic/userlogic"
 	"github.com/yiora/server/internal/model"
-	"github.com/yiora/server/internal/logic/authlogic"
 	"github.com/yiora/server/internal/pkg/apppush"
 	"github.com/yiora/server/internal/pkg/captcha"
 	"github.com/yiora/server/internal/pkg/jwtx"

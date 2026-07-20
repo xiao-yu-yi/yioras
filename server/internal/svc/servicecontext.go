@@ -22,18 +22,18 @@ import (
 )
 
 type ServiceContext struct {
-	Config config.Config
-	Redis  *redis.Redis
-	Email  *emailx.Sender
-	Pusher *wspush.Pusher    // api → ws 网关内部下行推送
-	Filter *sensitive.Filter // 发布/评论/私信共用的敏感词机审
-	Search search.Searcher   // 全站搜索:mysql(LIKE)或 meili 驱动,配置切换
-	Meili  *search.Meili     // 非 nil 时 api 进程负责起增量同步 daemon
-	AdminIPs *ipallow.List   // 后台访问 IP 白名单(启动时解析)
-	ImgScanner imgscan.Scanner // 图片机审驱动,nil=关闭(直传后异步送审)
-	Multipart *multipart.Client // S3 分片上传(APK 大文件),nil=对象存储未配置
-	LLM *llm.Client // AI 管家大模型,nil=纯 FAQ 规则模式
-	AppPush *apppush.Manager // 离线推送(APNs/厂商通道),无驱动时所有发送跳过
+	Config     config.Config
+	Redis      *redis.Redis
+	Email      *emailx.Sender
+	Pusher     *wspush.Pusher    // api → ws 网关内部下行推送
+	Filter     *sensitive.Filter // 发布/评论/私信共用的敏感词机审
+	Search     search.Searcher   // 全站搜索:mysql(LIKE)或 meili 驱动,配置切换
+	Meili      *search.Meili     // 非 nil 时 api 进程负责起增量同步 daemon
+	AdminIPs   *ipallow.List     // 后台访问 IP 白名单(启动时解析)
+	ImgScanner imgscan.Scanner   // 图片机审驱动,nil=关闭(直传后异步送审)
+	Multipart  *multipart.Client // S3 分片上传(APK 大文件),nil=对象存储未配置
+	LLM        *llm.Client       // AI 管家大模型,nil=纯 FAQ 规则模式
+	AppPush    *apppush.Manager  // 离线推送(APNs/厂商通道),无驱动时所有发送跳过
 
 	UserModel      *model.UserModel
 	PushModel      *model.PushModel
@@ -154,13 +154,13 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	// 通知落库切面:WS 在线端实时刷小红点;不在线走离线推送(互动 5 分钟/系统 1 分钟分类合并)
 	notifyModel.SetHook(notifyPushHook(pusher, pushMgr, pushModel, userModel, rds))
 	return &ServiceContext{
-		Config: c,
-		Redis:  rds,
-		AppPush: pushMgr,
-		AdminIPs: adminIPs,
+		Config:     c,
+		Redis:      rds,
+		AppPush:    pushMgr,
+		AdminIPs:   adminIPs,
 		ImgScanner: scanner,
-		Multipart: mpClient,
-		Meili: meiliClient,
+		Multipart:  mpClient,
+		Meili:      meiliClient,
 		LLM: llm.New(llm.Config{
 			BaseURL: c.LLM.BaseURL, APIKey: c.LLM.APIKey,
 			Model: c.LLM.Model, TimeoutSec: c.LLM.TimeoutSec,
