@@ -73,7 +73,8 @@ Write-Output "[9] dup=code$($dup.code) nonOwner=code$($forbid.code)"
 # 10. multipart apk upload: 3 parts (8+8+4MB) with mid-way resume, merge integrity, ownership guard, abort cleanup
 $partSize = 8MB
 $sizes = @($partSize, $partSize, 4MB)
-$total = ($sizes | Measure-Object -Sum).Sum
+# Measure-Object Sum is a double; pwsh 7 serializes it as 20971520.0 which the int field rejects (PS5 emits plain int)
+$total = [int64](($sizes | Measure-Object -Sum).Sum)
 $mp = PostJson "$api/upload/multipart/init" @{kind = "apk"; fileName = "big.apk"; size = $total} $h1
 if ($mp.code -ne 0) { throw "multipart init failed: $($mp.code)" }
 $rand = New-Object Random 42
