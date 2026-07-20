@@ -175,6 +175,11 @@ func (l *Logic) botReply(ctx context.Context, convID, uid int64, msgType int64, 
 		}
 	}
 	logx.WithContext(ctx).Infof("bot reply uid=%d source=%s", uid, source)
+	// 命中来源按日计数(后台 FAQ 页统计条),30 天滚动保留
+	statKey := fmt.Sprintf("bot:stat:%s:%s", source, time.Now().Format("20060102"))
+	if n, err := l.svcCtx.Redis.IncrCtx(ctx, statKey); err == nil && n == 1 {
+		_ = l.svcCtx.Redis.ExpireCtx(ctx, statKey, 30*86400)
+	}
 	msg, err := l.svcCtx.IMModel.AppendMessage(ctx, convID, model.BotUID, msgTypeText, reply, previewOf(msgTypeText, reply))
 	if err != nil {
 		logx.WithContext(ctx).Errorf("bot reply append: %v", err)
@@ -202,9 +207,14 @@ func (l *Logic) botLLMReply(ctx context.Context, convID, uid int64, text string,
 	if err != nil || n > 20 {
 		return ""
 	}
+	// 系统提示词:后台可运营(agreement 表 kind=bot_prompt),未配置用内置默认
+	prompt := botSystemPrompt
+	if row, err := l.svcCtx.AdminModel.GetAgreement(ctx, "bot_prompt"); err == nil && strings.TrimSpace(row.Content) != "" {
+		prompt = row.Content
+	}
 	// FAQ 词条作知识库注入
 	var kb strings.Builder
-	kb.WriteString(botSystemPrompt)
+	kb.WriteString(prompt)
 	if len(rules) > 0 {
 		kb.WriteString("\n\n平台知识库(优先依据):\n")
 		for _, r := range rules {

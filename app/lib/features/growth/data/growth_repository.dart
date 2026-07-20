@@ -6,6 +6,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_response.dart';
 import '../model/growth_models.dart';
+import 'mock_wallet.dart';
 
 /// 成长激励仓库（任务/签到/忧珠）；统一抛 [ApiException]。
 abstract interface class GrowthRepository {
@@ -105,35 +106,10 @@ class GrowthRepositoryHttp implements GrowthRepository {
   }
 }
 
-/// Mock 实现：内存任务/签到/流水，进度与领奖状态会话内生效。
+/// Mock 实现：任务/签到状态在会话内生效，余额与流水走共享钱包
+/// [MockYouzhuWallet]（与商城/付费解锁 Mock 账目一致）。
 class GrowthRepositoryMock implements GrowthRepository {
-  static bool _signedToday = false;
-  static int _continuous = 3;
-  static int _balance = 1350;
   static final Set<int> _claimed = {};
-  static int _nextLogId = 5000;
-
-  static final List<YouzhuLog> _logs = List.generate(26, (i) {
-    final types = [1, 2, 1, 4, 2, 5, 1, 6, 2, 3];
-    final bizType = types[i % types.length];
-    final income = bizType != 4 && bizType != 5;
-    final amount = income ? 10 + (i * 7) % 40 : -(30 + (i * 11) % 120);
-    return YouzhuLog(
-      id: 4000 - i,
-      bizType: bizType,
-      amount: amount,
-      balanceAfter: 1350 - i * 13,
-      remark: switch (bizType) {
-        1 => '完成任务「每日点赞」',
-        2 => '第 ${9 - i % 7} 天连续签到',
-        3 => '内测活动补偿发放',
-        4 => '兑换头像框「星河漫游」',
-        5 => '积分抽奖消耗',
-        _ => '解锁付费帖分成',
-      },
-      createdAt: DateTime.now().subtract(Duration(hours: 5 + i * 16)),
-    );
-  });
 
   static const _taskSeeds = [
     (1, '每日签到', 1, 'sign_in', 1, 10, 5),
@@ -149,10 +125,12 @@ class GrowthRepositoryMock implements GrowthRepository {
   @override
   Future<TaskCenter> fetchTaskCenter() async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
+    final signedToday = MockYouzhuWallet.signedToday;
+    final continuous = MockYouzhuWallet.continuous;
     return TaskCenter(
-      signedToday: _signedToday,
-      continuous: _signedToday ? _continuous : _continuous,
-      nextReward: 10 + ((_continuous + (_signedToday ? 0 : 1)) ~/ 3) * 5,
+      signedToday: signedToday,
+      continuous: continuous,
+      nextReward: 10 + ((continuous + (signedToday ? 0 : 1)) ~/ 3) * 5,
       tasks: [
         for (final s in _taskSeeds)
           GrowthTask(
@@ -178,28 +156,22 @@ class GrowthRepositoryMock implements GrowthRepository {
   @override
   Future<SignInResult> signIn() async {
     await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (_signedToday) {
+    if (MockYouzhuWallet.signedToday) {
       throw const ApiException(code: 42900, message: '今天已经签过到了');
     }
-    _signedToday = true;
-    _continuous += 1;
-    final reward = 10 + (_continuous ~/ 3) * 5;
-    _balance += reward;
-    _logs.insert(
-      0,
-      YouzhuLog(
-        id: _nextLogId++,
-        bizType: 2,
-        amount: reward,
-        balanceAfter: _balance,
-        remark: '第 $_continuous 天连续签到',
-        createdAt: DateTime.now(),
-      ),
+    MockYouzhuWallet.signedToday = true;
+    MockYouzhuWallet.continuous += 1;
+    final continuous = MockYouzhuWallet.continuous;
+    final reward = 10 + (continuous ~/ 3) * 5;
+    MockYouzhuWallet.apply(
+      bizType: 2,
+      amount: reward,
+      remark: '第 $continuous 天连续签到',
     );
     return SignInResult(
       reward: reward,
-      continuous: _continuous,
-      balance: _balance,
+      continuous: continuous,
+      balance: MockYouzhuWallet.balance,
     );
   }
 
@@ -213,25 +185,21 @@ class GrowthRepositoryMock implements GrowthRepository {
       (s) => s.$1 == taskId,
       orElse: () => throw const ApiException(code: 40400, message: '任务不存在'),
     );
-    _balance += seed.$6;
-    _logs.insert(
-      0,
-      YouzhuLog(
-        id: _nextLogId++,
-        bizType: 1,
-        amount: seed.$6,
-        balanceAfter: _balance,
-        remark: '完成任务「${seed.$2}」',
-        createdAt: DateTime.now(),
-      ),
+    MockYouzhuWallet.apply(
+      bizType: 1,
+      amount: seed.$6,
+      remark: '完成任务「${seed.$2}」',
     );
-    return ClaimResult(reward: seed.$6, balance: _balance);
+    return ClaimResult(reward: seed.$6, balance: MockYouzhuWallet.balance);
   }
 
   @override
   Future<YouzhuAccount> fetchAccount() async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    return YouzhuAccount(balance: _balance, signedToday: _signedToday);
+    return YouzhuAccount(
+      balance: MockYouzhuWallet.balance,
+      signedToday: MockYouzhuWallet.signedToday,
+    );
   }
 
   @override
@@ -242,8 +210,10 @@ class GrowthRepositoryMock implements GrowthRepository {
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
     final filtered = bizType == YouzhuBizType.all
-        ? _logs
-        : _logs.where((l) => l.bizType == bizType.value).toList();
+        ? MockYouzhuWallet.logs
+        : MockYouzhuWallet.logs
+              .where((l) => l.bizType == bizType.value)
+              .toList();
     final start = ((page - 1) * size).clamp(0, filtered.length);
     final end = (start + size).clamp(0, filtered.length);
     return filtered.sublist(start, end);

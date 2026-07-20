@@ -240,6 +240,14 @@ $blast = ($bhist | Sort-Object seq | Select-Object -Last 1)
 Invoke-RestMethod -Method Delete -Uri "$adm/faqs/$($nf.data.id)" -Headers $ha | Out-Null
 Write-Output "[11.95] faq create=code$($nf.code) botReply=[$($blast.content)] (expect SMOKE FAQ REPLY)"
 
+# 11.96 bot prompt ops + reply-source stats: bot_prompt editable by admin, hidden from user side; faq counter grew
+$bp = PostJson "$adm/agreements/bot_prompt" @{title = "BotPrompt"; content = "You are Yo, a test prompt."} $ha
+$bpRead = Invoke-RestMethod "$adm/agreements/bot_prompt" -Headers $ha
+$bpUser = Invoke-RestMethod "$api/agreements/bot_prompt"
+$bstats = (Invoke-RestMethod "$adm/bot/stats?days=7" -Headers $ha).data
+$faqSum = ($bstats.days | Measure-Object -Property faq -Sum).Sum
+Write-Output "[11.96] promptSave=code$($bp.code) adminRead=code$($bpRead.code) userSideHidden=code$($bpUser.code) (expect 40400); statFaq=$faqSum (>=1)"
+
 # 11.97 mall/task ops config: create deco (preview via admin presign) -> visible in shop -> offline -> gone; prize + task validation
 $dimg = New-UploadedImage "$adm/upload/presign" $ha "deco"
 $ndc = PostJson "$adm/mall/decorations" @{kind = 1; name = "SmokeFrame"; preview = $dimg; price = 5; durationDays = 7} $ha

@@ -584,6 +584,22 @@ func adminDeleteWordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminBotStatsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.notice", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.BotStatsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).BotStats(r.Context(), req.Days)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
 func adminFaqsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "ops.notice", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
 		var req types.PageReq
@@ -850,12 +866,16 @@ func adminPresignHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
-// agreementHandler 用户侧协议读取(免登录)。
+// agreementHandler 用户侧协议读取(免登录)。bot_prompt 等内部文案不对外暴露。
 func agreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.AgreementPathReq
 		if err := httpx.Parse(r, &req); err != nil {
 			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if req.Kind != "user" && req.Kind != "privacy" {
+			resp.Error(w, r, xerr.New(xerr.CodeNotFound, "协议不存在"))
 			return
 		}
 		out, err := adminlogic.New(svcCtx).Agreement(r.Context(), req.Kind)

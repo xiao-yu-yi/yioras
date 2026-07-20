@@ -748,8 +748,38 @@ func (l *Logic) PublishNotice(ctx context.Context, adminID int64, req *types.Adm
 }
 
 // Agreement 协议内容(用户侧/后台共用读取)。
+// agreementKinds 协议/静态文案合法类型;bot_prompt 为管家 LLM 系统提示词(仅后台可读写,用户侧接口拒绝)。
+var agreementKinds = map[string]bool{"user": true, "privacy": true, "bot_prompt": true}
+
+// BotStats 管家应答命中来源统计(Redis 按日计数,imlogic.botReply 写入)。
+func (l *Logic) BotStats(ctx context.Context, days int) (*types.BotStatsResp, error) {
+	out := &types.BotStatsResp{Days: make([]types.BotStatDay, 0, days)}
+	for i := days - 1; i >= 0; i-- {
+		day := time.Now().AddDate(0, 0, -i)
+		key := day.Format("20060102")
+		row := types.BotStatDay{Date: day.Format("2006-01-02")}
+		for _, src := range []string{"faq", "llm", "fallback"} {
+			v, err := l.svcCtx.Redis.GetCtx(ctx, fmt.Sprintf("bot:stat:%s:%s", src, key))
+			if err != nil || v == "" {
+				continue
+			}
+			n, _ := strconv.ParseInt(v, 10, 64)
+			switch src {
+			case "faq":
+				row.Faq = n
+			case "llm":
+				row.LLM = n
+			case "fallback":
+				row.Fallback = n
+			}
+		}
+		out.Days = append(out.Days, row)
+	}
+	return out, nil
+}
+
 func (l *Logic) Agreement(ctx context.Context, kind string) (*types.AgreementResp, error) {
-	if kind != "user" && kind != "privacy" {
+	if !agreementKinds[kind] {
 		return nil, xerr.Param("协议类型不存在")
 	}
 	row, err := l.svcCtx.AdminModel.GetAgreement(ctx, kind)
@@ -766,7 +796,7 @@ func (l *Logic) Agreement(ctx context.Context, kind string) (*types.AgreementRes
 
 // SaveAgreement 后台编辑协议。
 func (l *Logic) SaveAgreement(ctx context.Context, adminID int64, req *types.AdminAgreementSaveReq, ip string) error {
-	if req.Kind != "user" && req.Kind != "privacy" {
+	if !agreementKinds[req.Kind] {
 		return xerr.Param("协议类型不存在")
 	}
 	title := strings.TrimSpace(req.Title)

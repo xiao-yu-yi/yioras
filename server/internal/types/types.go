@@ -98,6 +98,23 @@ type MultipartPartsResp struct {
 	URLs  []MultipartPartURL  `json:"urls"` // 未完成分片的新签 URL(续传直接用)
 }
 
+// ---- 管家应答统计 ----
+
+type BotStatsReq struct {
+	Days int `form:"days,default=7,range=[1:30]"`
+}
+
+type BotStatDay struct {
+	Date     string `json:"date"` // yyyy-mm-dd
+	Faq      int64  `json:"faq"`
+	LLM      int64  `json:"llm"`
+	Fallback int64  `json:"fallback"`
+}
+
+type BotStatsResp struct {
+	Days []BotStatDay `json:"days"`
+}
+
 // ---- 搜索联想 ----
 
 type SuggestReq struct {

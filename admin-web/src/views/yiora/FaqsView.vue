@@ -7,6 +7,14 @@
       </div>
     </template>
 
+    <!-- 近 7 日应答来源:faq=词条命中 llm=大模型 fallback=兜底(未配置 LLM 时 llm 恒为 0) -->
+    <div class="stats">
+      <el-tag type="success">FAQ 命中 {{ stat.faq }}</el-tag>
+      <el-tag type="primary">大模型 {{ stat.llm }}</el-tag>
+      <el-tag type="info">兜底 {{ stat.fallback }}</el-tag>
+      <span class="sub">近 7 日应答来源分布;大模型未配置时问题会落到兜底,可据此补词条</span>
+    </div>
+
     <el-table :data="rows" v-loading="loading">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column label="关键词" min-width="180">
@@ -76,6 +84,7 @@ const dialog = ref(false)
 const saving = ref(false)
 const enabled = ref(true)
 const form = reactive<Partial<AdminFaqItem>>({})
+const stat = reactive({ faq: 0, llm: 0, fallback: 0 })
 
 async function load() {
   loading.value = true
@@ -86,6 +95,13 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadStats() {
+  const data = await api.botStats(7)
+  stat.faq = data.days.reduce((s, d) => s + d.faq, 0)
+  stat.llm = data.days.reduce((s, d) => s + d.llm, 0)
+  stat.fallback = data.days.reduce((s, d) => s + d.fallback, 0)
 }
 
 function openEdit(row?: AdminFaqItem) {
@@ -120,7 +136,10 @@ async function remove(row: AdminFaqItem) {
   load()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadStats()
+})
 </script>
 
 <style scoped>
@@ -139,5 +158,11 @@ onMounted(load)
 .pager {
   margin-top: 14px;
   justify-content: flex-end;
+}
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 </style>

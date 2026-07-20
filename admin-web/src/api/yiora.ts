@@ -316,6 +316,10 @@ export const api = {
     http.get(`/agreements/${kind}`) as Promise<{ kind: string; title: string; content: string; updatedAt: number }>,
   saveAgreement: (kind: string, title: string, content: string) =>
     http.post(`/agreements/${kind}`, { title, content }),
+
+  // AI 管家应答来源统计
+  botStats: (days = 7) =>
+    http.get('/bot/stats', { params: { days } }) as Promise<{ days: { date: string; faq: number; llm: number; fallback: number }[] }>,
 }
 
 export interface AdminCircleItem {
