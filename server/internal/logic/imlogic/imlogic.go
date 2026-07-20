@@ -152,13 +152,17 @@ func (l *Logic) offlinePush(ctx context.Context, fromUID, toUID, convID int64, p
 	if !l.svcCtx.AppPush.Enabled() {
 		return
 	}
-	gateKey := fmt.Sprintf("push:conv:%d:%d", convID, toUID)
-	ok, err := l.svcCtx.Redis.SetnxExCtx(ctx, gateKey, "1", 60)
-	if err != nil || !ok {
+	// 用户级推送开关(设置页「私信推送」)
+	if prefs, err := l.svcCtx.UserModel.PushPrefs(ctx, toUID); err != nil || prefs&model.PushPrefDM == 0 {
 		return
 	}
 	tokens, err := l.svcCtx.PushModel.TokensByUser(ctx, toUID)
 	if err != nil || len(tokens) == 0 {
+		return
+	}
+	gateKey := fmt.Sprintf("push:conv:%d:%d", convID, toUID)
+	ok, err := l.svcCtx.Redis.SetnxExCtx(ctx, gateKey, "1", 60)
+	if err != nil || !ok {
 		return
 	}
 	sender, err := l.svcCtx.UserModel.FindByID(ctx, fromUID)

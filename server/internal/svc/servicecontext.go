@@ -62,21 +62,25 @@ type ServiceContext struct {
 // notifyPushHook 站内通知切面:先经 WS 给在线端推 notify.new 帧(实时小红点),
 // 不在线且有推送驱动时走 APNs/厂商通道,按类别合并频控防轰炸:
 // 互动类(赞/评论)5 分钟一条汇总文案;系统类(审核/处置结果)1 分钟一条推原文。
-func notifyPushHook(pusher *wspush.Pusher, mgr *apppush.Manager, pm *model.PushModel, rds *redis.Redis) model.NotifyHook {
+// 尊重用户设置页的分类推送开关(user.push_prefs)。
+func notifyPushHook(pusher *wspush.Pusher, mgr *apppush.Manager, pm *model.PushModel, um *model.UserModel, rds *redis.Redis) model.NotifyHook {
 	return func(ctx context.Context, n *model.Notification) {
 		online := pusher.Push(ctx, n.UserID, "notify.new", map[string]any{"type": n.Type})
 		if online || !mgr.Enabled() {
 			return
 		}
 		title, body := "Yiora", n.Content
-		gate, gateSec := "", 0
+		gate, gateSec, prefBit := "", 0, int64(0)
 		switch n.Type {
 		case model.NotifyTypeLike, model.NotifyTypeComment:
-			gate, gateSec = fmt.Sprintf("push:ntf:i:%d", n.UserID), 300
+			gate, gateSec, prefBit = fmt.Sprintf("push:ntf:i:%d", n.UserID), 300, model.PushPrefInteract
 			title, body = "互动提醒", "你收到了新的点赞/评论,点开看看"
 		default: // 系统通知逐条推原文,短频控防连发
-			gate, gateSec = fmt.Sprintf("push:ntf:s:%d", n.UserID), 60
+			gate, gateSec, prefBit = fmt.Sprintf("push:ntf:s:%d", n.UserID), 60, model.PushPrefSystem
 			title = "系统通知"
+		}
+		if prefs, err := um.PushPrefs(ctx, n.UserID); err != nil || prefs&prefBit == 0 {
+			return
 		}
 		// 先查 token 再消耗频控窗口:未注册推送的用户不白耗合并窗口
 		tokens, err := pm.TokensByUser(ctx, n.UserID)
@@ -146,8 +150,9 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	pusher := wspush.New(c.WsPush.URL, c.WsPush.Token)
 	notifyModel := model.NewNotifyModel(conn)
 	pushModel := model.NewPushModel(conn)
+	userModel := model.NewUserModel(conn)
 	// 通知落库切面:WS 在线端实时刷小红点;不在线走离线推送(互动 5 分钟/系统 1 分钟分类合并)
-	notifyModel.SetHook(notifyPushHook(pusher, pushMgr, pushModel, rds))
+	notifyModel.SetHook(notifyPushHook(pusher, pushMgr, pushModel, userModel, rds))
 	return &ServiceContext{
 		Config: c,
 		Redis:  rds,
@@ -169,7 +174,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Filter: sensitive.NewFilter(sensitiveModel),
 		Search: searcher,
 
-		UserModel:      model.NewUserModel(conn),
+		UserModel:      userModel,
 		PushModel:      pushModel,
 		CircleModel:    model.NewCircleModel(conn),
 		PostModel:      model.NewPostModel(conn),

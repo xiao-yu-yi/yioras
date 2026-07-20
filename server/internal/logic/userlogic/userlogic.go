@@ -148,22 +148,52 @@ func (l *Logic) ReportPushToken(ctx context.Context, uid int64, req *types.PushT
 	})
 }
 
-// Settings 用户设置(青少年模式等)。
+// Settings 用户设置(青少年模式/推送开关)。
 func (l *Logic) Settings(ctx context.Context, uid int64) (*types.UserSettingsResp, error) {
 	u, err := l.svcCtx.UserModel.FindByID(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("find user: %w", err)
 	}
-	return &types.UserSettingsResp{TeenMode: u.TeenMode == 1}, nil
+	return &types.UserSettingsResp{
+		TeenMode:     u.TeenMode == 1,
+		PushDM:       u.PushPrefs&model.PushPrefDM != 0,
+		PushInteract: u.PushPrefs&model.PushPrefInteract != 0,
+		PushSystem:   u.PushPrefs&model.PushPrefSystem != 0,
+	}, nil
 }
 
-// UpdateSettings 更新设置。
+// UpdateSettings 更新设置(PATCH 三态:nil 不变)。
 func (l *Logic) UpdateSettings(ctx context.Context, uid int64, req *types.UpdateSettingsReq) error {
-	if req.TeenMode == nil {
+	if req.TeenMode == nil && req.PushDM == nil && req.PushInteract == nil && req.PushSystem == nil {
 		return xerr.Param("没有需要更新的设置")
 	}
-	if err := l.svcCtx.UserModel.SetTeenMode(ctx, uid, *req.TeenMode); err != nil {
-		return err
+	if req.TeenMode != nil {
+		if err := l.svcCtx.UserModel.SetTeenMode(ctx, uid, *req.TeenMode); err != nil {
+			return err
+		}
+	}
+	if req.PushDM != nil || req.PushInteract != nil || req.PushSystem != nil {
+		u, err := l.svcCtx.UserModel.FindByID(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("find user: %w", err)
+		}
+		prefs := u.PushPrefs
+		setBit := func(v *bool, bit int64) {
+			if v == nil {
+				return
+			}
+			if *v {
+				prefs |= bit
+			} else {
+				prefs &^= bit
+			}
+		}
+		setBit(req.PushDM, model.PushPrefDM)
+		setBit(req.PushInteract, model.PushPrefInteract)
+		setBit(req.PushSystem, model.PushPrefSystem)
+		if err := l.svcCtx.UserModel.SetPushPrefs(ctx, uid, prefs); err != nil {
+			return err
+		}
 	}
 	return nil
 }

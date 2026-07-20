@@ -370,6 +370,18 @@ $pushLast2 = (docker compose exec -T redis redis-cli GET mockpush:last:smoketok-
 $ntfLink = $pushLast2.Contains('yiora://notifications/')
 Write-Output "[12.38] notifyPush count=$pushCnt2 (expect 2 = DM push + one merged interaction) deeplink=$ntfLink (expect True)"
 
+# 12.39 push preference switches: B turns interaction push off -> like triggers nothing even with a fresh window
+Invoke-RestMethod -Method Put -Uri "$api/user/settings" -Headers $h2 -ContentType 'application/json' -Body '{"pushInteract":false}' | Out-Null
+$setRead = (Invoke-RestMethod "$api/user/settings" -Headers $h2).data
+docker compose exec -T redis redis-cli DEL push:ntf:i:$uidB | Out-Null
+$bp3 = PostJson "$api/posts" @{circleId = 2; content = "push pref target"} $h2
+PostJson "$api/posts/$($bp3.data.postId)/like" @{} $h1 | Out-Null
+Start-Sleep -Milliseconds 500
+$pushCnt3 = (docker compose exec -T redis redis-cli GET mockpush:count:smoketok-b | Out-String).Trim()
+Invoke-RestMethod -Method Put -Uri "$api/user/settings" -Headers $h2 -ContentType 'application/json' -Body '{"pushInteract":true}' | Out-Null
+$setBack = (Invoke-RestMethod "$api/user/settings" -Headers $h2).data
+Write-Output "[12.39] prefOff read=$($setRead.pushInteract) (expect False) dmStillOn=$($setRead.pushDm) (expect True); likeWhileOff count=$pushCnt3 (expect 2, unchanged); restored=$($setBack.pushInteract) (expect True)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

@@ -27,6 +27,7 @@ type (
 		Exp       int64          `db:"exp"`
 		Status    int64          `db:"status"`
 		TeenMode  int64          `db:"teen_mode"`
+		PushPrefs int64          `db:"push_prefs"`
 		CreatedAt time.Time      `db:"created_at"`
 		UpdatedAt time.Time      `db:"updated_at"`
 	}
@@ -88,7 +89,7 @@ func (m *UserModel) FindAuthByEmail(ctx context.Context, email string) (*UserAut
 func (m *UserModel) FindByID(ctx context.Context, id int64) (*User, error) {
 	var u User
 	err := m.conn.QueryRowCtx(ctx, &u,
-		"SELECT id, display_no, nickname, avatar, cover, signature, gender, birthday, level, exp, status, teen_mode, created_at, updated_at FROM `user` WHERE id = ? LIMIT 1", id)
+		"SELECT id, display_no, nickname, avatar, cover, signature, gender, birthday, level, exp, status, teen_mode, push_prefs, created_at, updated_at FROM `user` WHERE id = ? LIMIT 1", id)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +117,29 @@ func (m *UserModel) UpdatePassword(ctx context.Context, uid int64, passwordHash 
 }
 
 // Deactivate 注销账号(status=4);邮箱保留不释放(防止身份复用纠纷)。
+// 离线推送开关位(user.push_prefs)
+const (
+	PushPrefDM       = 1 // 私信
+	PushPrefInteract = 2 // 点赞/评论互动
+	PushPrefSystem   = 4 // 系统通知
+)
+
+// SetPushPrefs 覆盖推送偏好位。
+func (m *UserModel) SetPushPrefs(ctx context.Context, uid int64, prefs int64) error {
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `user` SET push_prefs = ? WHERE id = ?", prefs, uid); err != nil {
+		return fmt.Errorf("set push prefs: %w", err)
+	}
+	return nil
+}
+
+// PushPrefs 单查偏好位(推送切面高频用,只取一列)。
+func (m *UserModel) PushPrefs(ctx context.Context, uid int64) (int64, error) {
+	var prefs int64
+	err := m.conn.QueryRowCtx(ctx, &prefs, "SELECT push_prefs FROM `user` WHERE id = ? LIMIT 1", uid)
+	return prefs, err
+}
+
 // SetTeenMode 青少年模式开关。
 func (m *UserModel) SetTeenMode(ctx context.Context, uid int64, on bool) error {
 	v := 0

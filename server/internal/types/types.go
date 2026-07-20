@@ -37,14 +37,20 @@ type KickDeviceReq struct {
 	DeviceID string `path:"id"`
 }
 
-// ---- 用户设置(青少年模式等) ----
+// ---- 用户设置(青少年模式/推送开关) ----
 
 type UserSettingsResp struct {
-	TeenMode bool `json:"teenMode"`
+	TeenMode     bool `json:"teenMode"`
+	PushDM       bool `json:"pushDm"`       // 私信离线推送
+	PushInteract bool `json:"pushInteract"` // 点赞/评论离线推送
+	PushSystem   bool `json:"pushSystem"`   // 系统通知离线推送
 }
 
 type UpdateSettingsReq struct {
-	TeenMode *bool `json:"teenMode,optional"` // 缺省不变
+	TeenMode     *bool `json:"teenMode,optional"` // 缺省不变,下同
+	PushDM       *bool `json:"pushDm,optional"`
+	PushInteract *bool `json:"pushInteract,optional"`
+	PushSystem   *bool `json:"pushSystem,optional"`
 }
 
 // ---- 大文件分片上传(APK) ----
