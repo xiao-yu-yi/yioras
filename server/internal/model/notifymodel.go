@@ -28,10 +28,21 @@ type (
 		CreatedAt  time.Time `db:"created_at"`
 	}
 
-	NotifyModel struct{ conn sqlx.SqlConn }
+	// NotifyHook 单条通知落库成功后的切面(svc 注入:WS 小红点实时推 + 离线推送补偿)。
+	// 放 model 层 hook 是为了让全部 Add 调用点(点赞/评论/审核/处置…)零改动统一生效;
+	// 注:公告全员扇出走批量 SQL 不经 Add,天然不触发离线推送(避免广播轰炸)。
+	NotifyHook func(ctx context.Context, n *Notification)
+
+	NotifyModel struct {
+		conn sqlx.SqlConn
+		hook NotifyHook
+	}
 )
 
 func NewNotifyModel(conn sqlx.SqlConn) *NotifyModel { return &NotifyModel{conn: conn} }
+
+// SetHook 启动装配期一次性注入,运行期只读。
+func (m *NotifyModel) SetHook(h NotifyHook) { m.hook = h }
 
 // Add 写入通知。自己触发自己的互动不落通知,由调用方保证。
 func (m *NotifyModel) Add(ctx context.Context, n *Notification) error {
@@ -40,6 +51,9 @@ func (m *NotifyModel) Add(ctx context.Context, n *Notification) error {
 		n.UserID, n.Type, n.ActorID, n.TargetType, n.TargetID, n.Content)
 	if err != nil {
 		return fmt.Errorf("insert notification: %w", err)
+	}
+	if m.hook != nil {
+		m.hook(ctx, n)
 	}
 	return nil
 }

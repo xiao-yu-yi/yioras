@@ -359,6 +359,17 @@ $pushLast = (docker compose exec -T redis redis-cli GET mockpush:last:smoketok-b
 $pushHasLink = $pushLast.Contains('yiora://im/conversation/')
 Write-Output "[12.37] offlinePush count=$pushCnt (expect 1, 60s dedup) deeplink=$pushHasLink (expect True)"
 
+# 12.38 notification offline push: B posts, A likes+comments while B offline -> one merged interaction push (5min dedup)
+docker compose exec -T redis redis-cli DEL push:ntf:i:$uidB | Out-Null # earlier suites may have consumed the merge window
+$bp2 = PostJson "$api/posts" @{circleId = 2; content = "notify push target"} $h2
+PostJson "$api/posts/$($bp2.data.postId)/like" @{} $h1 | Out-Null
+PostJson "$api/comments" @{postId = $bp2.data.postId; content = "notify push comment"} $h1 | Out-Null
+Start-Sleep -Milliseconds 500
+$pushCnt2 = (docker compose exec -T redis redis-cli GET mockpush:count:smoketok-b | Out-String).Trim()
+$pushLast2 = (docker compose exec -T redis redis-cli GET mockpush:last:smoketok-b | Out-String).Trim()
+$ntfLink = $pushLast2.Contains('yiora://notifications/')
+Write-Output "[12.38] notifyPush count=$pushCnt2 (expect 2 = DM push + one merged interaction) deeplink=$ntfLink (expect True)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

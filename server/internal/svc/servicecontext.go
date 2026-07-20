@@ -1,6 +1,9 @@
 package svc
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/yiora/server/internal/config"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/apppush"
@@ -56,6 +59,44 @@ type ServiceContext struct {
 	AdminModel     *model.AdminModel
 }
 
+// notifyPushHook 站内通知切面:先经 WS 给在线端推 notify.new 帧(实时小红点),
+// 不在线且有推送驱动时走 APNs/厂商通道,按类别合并频控防轰炸:
+// 互动类(赞/评论)5 分钟一条汇总文案;系统类(审核/处置结果)1 分钟一条推原文。
+func notifyPushHook(pusher *wspush.Pusher, mgr *apppush.Manager, pm *model.PushModel, rds *redis.Redis) model.NotifyHook {
+	return func(ctx context.Context, n *model.Notification) {
+		online := pusher.Push(ctx, n.UserID, "notify.new", map[string]any{"type": n.Type})
+		if online || !mgr.Enabled() {
+			return
+		}
+		title, body := "Yiora", n.Content
+		gate, gateSec := "", 0
+		switch n.Type {
+		case model.NotifyTypeLike, model.NotifyTypeComment:
+			gate, gateSec = fmt.Sprintf("push:ntf:i:%d", n.UserID), 300
+			title, body = "互动提醒", "你收到了新的点赞/评论,点开看看"
+		default: // 系统通知逐条推原文,短频控防连发
+			gate, gateSec = fmt.Sprintf("push:ntf:s:%d", n.UserID), 60
+			title = "系统通知"
+		}
+		// 先查 token 再消耗频控窗口:未注册推送的用户不白耗合并窗口
+		tokens, err := pm.TokensByUser(ctx, n.UserID)
+		if err != nil || len(tokens) == 0 {
+			return
+		}
+		ok, err := rds.SetnxExCtx(ctx, gate, "1", gateSec)
+		if err != nil || !ok {
+			return
+		}
+		note := apppush.Notification{
+			Title: title, Body: body,
+			Deeplink: fmt.Sprintf("yiora://notifications/%d", n.Type),
+		}
+		for _, t := range tokens {
+			mgr.Send(ctx, t.Channel, t.Token, note)
+		}
+	}
+}
+
 func NewServiceContext(c config.Config) *ServiceContext {
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
 	sensitiveModel := model.NewSensitiveModel(conn)
@@ -101,6 +142,12 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		logx.Must(err) // 配了 APNs 却密钥非法,宁可起不来
 	}
 	pushMgr.Register("apns", apns)
+
+	pusher := wspush.New(c.WsPush.URL, c.WsPush.Token)
+	notifyModel := model.NewNotifyModel(conn)
+	pushModel := model.NewPushModel(conn)
+	// 通知落库切面:WS 在线端实时刷小红点;不在线走离线推送(互动 5 分钟/系统 1 分钟分类合并)
+	notifyModel.SetHook(notifyPushHook(pusher, pushMgr, pushModel, rds))
 	return &ServiceContext{
 		Config: c,
 		Redis:  rds,
@@ -118,17 +165,17 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			Username: c.Email.Username, Password: c.Email.Password,
 			From: c.Email.From, Mock: c.Email.Mock,
 		}),
-		Pusher: wspush.New(c.WsPush.URL, c.WsPush.Token),
+		Pusher: pusher,
 		Filter: sensitive.NewFilter(sensitiveModel),
 		Search: searcher,
 
 		UserModel:      model.NewUserModel(conn),
-		PushModel:      model.NewPushModel(conn),
+		PushModel:      pushModel,
 		CircleModel:    model.NewCircleModel(conn),
 		PostModel:      model.NewPostModel(conn),
 		InteractModel:  model.NewInteractModel(conn),
 		IMModel:        model.NewIMModel(conn),
-		NotifyModel:    model.NewNotifyModel(conn),
+		NotifyModel:    notifyModel,
 		SensitiveModel: sensitiveModel,
 		RelationModel:  model.NewRelationModel(conn),
 		BannerModel:    model.NewBannerModel(conn),
