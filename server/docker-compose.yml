@@ -55,6 +55,9 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    volumes:
+      # 与 mysql-data 生命周期对齐:down 保留对象(库里 fileUrl 不断链),down -v 一起清
+      - minio-data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -94,3 +97,4 @@ services:
 
 volumes:
   mysql-data:
+  minio-data:
