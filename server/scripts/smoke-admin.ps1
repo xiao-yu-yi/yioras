@@ -414,6 +414,18 @@ $kick = PostJson "$adm/users/$uidB/devices/kick" @{deviceId = $lb.data.deviceId}
 $deadMe = Invoke-RestMethod "$api/user/me" -Headers $h2
 Write-Output "[12.43] devices=$(@($devs).Count) (>=1) kick=code$($kick.code) kickedToken=code$($deadMe.code) (expect 40100)"
 
+# 12.44 audit content preview + contents first-image: reviewer can see original text/images before deciding
+$aq3 = (Invoke-RestMethod "$adm/audits" -Headers $ha).data
+$pvOk = 0; $pvImgs = 0
+if (@($aq3).Count -gt 0) {
+    $pvResp = Invoke-RestMethod "$adm/audits/$($aq3[0].id)/preview" -Headers $ha
+    $pvOk = $pvResp.code
+    $pvImgs = @($pvResp.data.images).Count
+}
+$csImg = (Invoke-RestMethod "$adm/contents?type=1&keyword=imgscan" -Headers $ha).data
+$firstImg = @($csImg.list | Where-Object { $_.firstImage -ne '' }).Count
+Write-Output "[12.44] preview=code$pvOk (expect 0) previewImgs=$pvImgs; contentsWithFirstImage=$firstImg (>=1)"
+
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data
 PostJson "$adm/users/$uidB/level" @{level = 9} $ha | Out-Null

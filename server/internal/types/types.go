@@ -130,6 +130,18 @@ type BotStatsResp struct {
 	Days []BotStatDay `json:"days"`
 }
 
+// ---- 审核内容预览 ----
+
+type AuditPreviewResp struct {
+	Kind       string   `json:"kind"` // post / comment / software
+	Title      string   `json:"title"`
+	Content    string   `json:"content"`
+	Logo       string   `json:"logo,omitempty"`
+	Images     []string `json:"images"`
+	AuthorID   int64    `json:"authorId"`
+	AuthorName string   `json:"authorName"`
+}
+
 // ---- 软件库管理 ----
 
 type AdminSoftwareListReq struct {
@@ -1150,8 +1162,9 @@ type AdminContentItem struct {
 	CircleID   int64  `json:"circleId,omitempty"` // 帖子专属
 	BizType    int64  `json:"bizType,omitempty"`  // 评论专属:1帖子 2软件
 	BizID      int64  `json:"bizId,omitempty"`    // 评论专属
-	IsTop      int64  `json:"isTop"`     // 帖子:首页置顶精选
-	IsEssence  int64  `json:"isEssence"` // 帖子:加精
+	IsTop      int64  `json:"isTop"`      // 帖子:首页置顶精选
+	IsEssence  int64  `json:"isEssence"`  // 帖子:加精
+	FirstImage string `json:"firstImage"` // 帖子首图(评论恒空)
 	LikeCount  int64  `json:"likeCount"`
 	ViewCount  int64  `json:"viewCount"` // 评论恒 0
 	CreatedAt  int64  `json:"createdAt"`

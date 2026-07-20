@@ -753,6 +753,56 @@ func (l *Logic) PublishNotice(ctx context.Context, adminID int64, req *types.Adm
 // agreementKinds 协议/静态文案合法类型;bot_prompt 为管家 LLM 系统提示词(仅后台可读写,用户侧接口拒绝)。
 var agreementKinds = map[string]bool{"user": true, "privacy": true, "bot_prompt": true}
 
+// AuditPreview 审核单内容回查:审核员看原文与图片再裁决(帖/评论/软件)。
+func (l *Logic) AuditPreview(ctx context.Context, auditID int64) (*types.AuditPreviewResp, error) {
+	audit, err := l.svcCtx.AdminModel.FindAudit(ctx, auditID)
+	if err != nil {
+		if model.IsNotFound(err) {
+			return nil, xerr.New(xerr.CodeNotFound, "审核单不存在")
+		}
+		return nil, err
+	}
+	out := &types.AuditPreviewResp{Images: []string{}}
+	fillAuthor := func(uid int64) {
+		out.AuthorID = uid
+		if u, err := l.svcCtx.UserModel.FindByID(ctx, uid); err == nil {
+			out.AuthorName = u.Nickname
+		}
+	}
+	switch audit.BizType {
+	case model.AuditBizPost:
+		p, err := l.svcCtx.PostModel.FindByID(ctx, audit.BizID)
+		if err != nil {
+			return nil, xerr.New(xerr.CodeNotFound, "帖子不存在")
+		}
+		out.Kind, out.Title, out.Content = "post", p.Title, p.Content
+		if imgs, err := l.svcCtx.PostModel.ImagesOf(ctx, []int64{p.ID}); err == nil {
+			for _, im := range imgs[p.ID] {
+				out.Images = append(out.Images, im.URL)
+			}
+		}
+		fillAuthor(p.UserID)
+	case model.AuditBizComment:
+		c, err := l.svcCtx.InteractModel.FindCommentByID(ctx, audit.BizID)
+		if err != nil {
+			return nil, xerr.New(xerr.CodeNotFound, "评论不存在")
+		}
+		out.Kind, out.Content = "comment", c.Content
+		fillAuthor(c.UserID)
+	case model.AuditBizSoftware:
+		s, err := l.svcCtx.SoftwareModel.FindByID(ctx, audit.BizID)
+		if err != nil {
+			return nil, xerr.New(xerr.CodeNotFound, "软件不存在")
+		}
+		out.Kind, out.Title, out.Content, out.Logo = "software", s.Name, s.Intro, s.Logo
+		out.Images = model.UnmarshalImages(s.Images)
+		fillAuthor(s.UserID)
+	default:
+		return nil, xerr.Param("未知的审核类型")
+	}
+	return out, nil
+}
+
 // SoftwaresAdmin 软件库检索(全状态,含待审/驳回/下架)。
 func (l *Logic) SoftwaresAdmin(ctx context.Context, req *types.AdminSoftwareListReq) (*types.AdminSoftwareListResp, error) {
 	offset, limit := req.Offset()
@@ -1058,7 +1108,7 @@ func (l *Logic) Contents(ctx context.Context, req *types.AdminContentListReq) (*
 			ID: r.ID, AuthorID: r.UserID, AuthorName: r.Nickname,
 			Title: r.Title, Content: truncateRunes(r.Content, 120), Status: r.Status,
 			CircleID: r.CircleID, BizType: r.BizType, BizID: r.BizID,
-			IsTop: r.IsTop, IsEssence: r.IsEssence,
+			IsTop: r.IsTop, IsEssence: r.IsEssence, FirstImage: r.FirstImage,
 			LikeCount: r.LikeCount, ViewCount: r.ViewCount, CreatedAt: r.CreatedAt.UnixMilli(),
 		})
 	}

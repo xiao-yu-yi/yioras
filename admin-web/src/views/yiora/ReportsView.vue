@@ -76,9 +76,17 @@
           <el-descriptions-item label="举报分类">{{ catNames[current.category] ?? '其他' }}</el-descriptions-item>
           <el-descriptions-item label="补充说明">{{ current.reason || '(无)' }}</el-descriptions-item>
           <el-descriptions-item v-if="current.images.length" label="证据图">
-            <el-link v-for="(img, i) in current.images" :key="img" type="primary" :href="img" target="_blank" class="img-link">
-              图{{ i + 1 }}
-            </el-link>
+            <div class="evidence-imgs">
+              <el-image
+                v-for="img in current.images"
+                :key="img"
+                :src="img"
+                :preview-src-list="current.images"
+                preview-teleported
+                fit="cover"
+                class="evidence-img"
+              />
+            </div>
           </el-descriptions-item>
         </el-descriptions>
 
@@ -219,5 +227,15 @@ onMounted(load)
 }
 .img-link {
   margin-right: 10px;
+}
+.evidence-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.evidence-img {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
 }
 </style>

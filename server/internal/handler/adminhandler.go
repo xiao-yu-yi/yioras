@@ -934,6 +934,22 @@ func adminSaveAgreementHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminAuditPreviewHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
+		var req types.IDPath
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := adminlogic.New(svcCtx).AuditPreview(r.Context(), req.ID)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	})
+}
+
 func adminSoftwaresHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "audit", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
 		var req types.AdminSoftwareListReq

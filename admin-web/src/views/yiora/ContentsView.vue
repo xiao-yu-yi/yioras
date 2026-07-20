@@ -31,6 +31,19 @@
       <el-table-column label="作者" width="130">
         <template #default="{ row }">{{ row.authorName }} <span class="sub">#{{ row.authorId }}</span></template>
       </el-table-column>
+      <el-table-column v-if="type === 1" label="首图" width="70">
+        <template #default="{ row }">
+          <el-image
+            v-if="row.firstImage"
+            :src="row.firstImage"
+            :preview-src-list="[row.firstImage]"
+            preview-teleported
+            fit="cover"
+            class="thumb"
+          />
+          <span v-else class="sub">-</span>
+        </template>
+      </el-table-column>
       <el-table-column v-if="type === 1" prop="title" label="标题" min-width="140" show-overflow-tooltip />
       <el-table-column prop="content" label="内容" min-width="220" show-overflow-tooltip />
       <el-table-column v-if="type === 2" label="所属" width="110">
@@ -210,6 +223,11 @@ onMounted(load)
 .sub {
   color: #909399;
   font-size: 12px;
+}
+.thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
 }
 .pager {
   margin-top: 14px;

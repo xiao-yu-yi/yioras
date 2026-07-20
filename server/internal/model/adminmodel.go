@@ -581,11 +581,12 @@ type AdminContentRow struct {
 	CircleID  int64     `db:"circle_id"`
 	BizType   int64     `db:"biz_type"`
 	BizID     int64     `db:"biz_id"`
-	IsTop     int64     `db:"is_top"`
-	IsEssence int64     `db:"is_essence"`
-	LikeCount int64     `db:"like_count"`
-	ViewCount int64     `db:"view_count"`
-	CreatedAt time.Time `db:"created_at"`
+	IsTop      int64     `db:"is_top"`
+	IsEssence  int64     `db:"is_essence"`
+	LikeCount  int64     `db:"like_count"`
+	ViewCount  int64     `db:"view_count"`
+	FirstImage string    `db:"first_image"`
+	CreatedAt  time.Time `db:"created_at"`
 }
 
 // SearchPostsAdmin 后台帖子检索:标题/正文模糊 + 全状态筛选(status<0 不筛),新帖在前。
@@ -608,7 +609,9 @@ func (m *AdminModel) SearchPostsAdmin(ctx context.Context, keyword string, statu
 	}
 	var rows []*AdminContentRow
 	q := `SELECT p.id, p.user_id, u.nickname, p.title, p.content, p.status, p.circle_id,
-		0 AS biz_type, 0 AS biz_id, p.is_top, p.is_essence, p.like_count, p.view_count, p.created_at ` + from + " ORDER BY p.id DESC LIMIT ?, ?"
+		0 AS biz_type, 0 AS biz_id, p.is_top, p.is_essence, p.like_count, p.view_count,
+		COALESCE((SELECT url FROM post_image i WHERE i.post_id = p.id ORDER BY i.sort LIMIT 1), '') AS first_image,
+		p.created_at ` + from + " ORDER BY p.id DESC LIMIT ?, ?"
 	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
 		return 0, nil, fmt.Errorf("search posts admin: %w", err)
 	}
@@ -634,7 +637,8 @@ func (m *AdminModel) SearchCommentsAdmin(ctx context.Context, keyword string, st
 	}
 	var rows []*AdminContentRow
 	q := `SELECT c.id, c.user_id, u.nickname, '' AS title, c.content, c.status, 0 AS circle_id,
-		c.biz_type, c.biz_id, 0 AS is_top, 0 AS is_essence, c.like_count, 0 AS view_count, c.created_at ` + from + " ORDER BY c.id DESC LIMIT ?, ?"
+		c.biz_type, c.biz_id, 0 AS is_top, 0 AS is_essence, c.like_count, 0 AS view_count,
+		'' AS first_image, c.created_at ` + from + " ORDER BY c.id DESC LIMIT ?, ?"
 	if err := m.conn.QueryRowsCtx(ctx, &rows, q, append(args, offset, limit)...); err != nil {
 		return 0, nil, fmt.Errorf("search comments admin: %w", err)
 	}

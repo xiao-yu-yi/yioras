@@ -153,6 +153,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodGet, Path: "/roles", Handler: adminRolesHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/audits", Handler: adminAuditsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/audits/:id/decide", Handler: adminDecideHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/audits/:id/preview", Handler: adminAuditPreviewHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/certifications", Handler: adminCertsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/certifications/:id/decide", Handler: adminDecideCertHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/circles", Handler: adminCirclesHandler(svcCtx)},

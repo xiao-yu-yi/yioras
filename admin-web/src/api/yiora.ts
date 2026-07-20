@@ -112,6 +112,7 @@ export interface AdminContentItem {
   bizId?: number
   isTop: number
   isEssence: number
+  firstImage: string
   likeCount: number
   viewCount: number
   createdAt: number
@@ -324,6 +325,18 @@ export const api = {
   // 等级规则
   levelRules: () => http.get('/levels') as Promise<LevelRuleItem[]>,
   saveLevelRules: (rules: LevelRuleItem[]) => http.post('/levels', { rules }),
+
+  // 审核内容回查(原文+图片)
+  auditPreview: (id: number) =>
+    http.get(`/audits/${id}/preview`) as Promise<{
+      kind: 'post' | 'comment' | 'software'
+      title: string
+      content: string
+      logo?: string
+      images: string[]
+      authorId: number
+      authorName: string
+    }>,
 
   // 软件库管理
   softwares: (p: { kw?: string; status?: number; page?: number }) =>

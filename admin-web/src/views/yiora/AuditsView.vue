@@ -51,13 +51,53 @@
       <el-table-column label="提交时间" width="170">
         <template #default="{ row }">{{ fmtTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="170" fixed="right">
+      <el-table-column label="操作" width="230" fixed="right">
         <template #default="{ row }">
+          <el-button size="small" @click="preview(row)">查看</el-button>
           <el-button size="small" type="success" @click="decide(row, true)">通过</el-button>
           <el-button size="small" type="danger" @click="decide(row, false)">驳回</el-button>
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 内容回查:原文与图片看清楚再裁决 -->
+    <el-drawer v-model="pvDrawer" :title="`内容回查 #${pvAudit?.id ?? ''}`" size="480px">
+      <div v-loading="pvLoading">
+        <template v-if="pv">
+          <el-descriptions :column="1" border size="small" class="pv-meta">
+            <el-descriptions-item label="类型">{{ { post: '帖子', comment: '评论', software: '软件' }[pv.kind] }}</el-descriptions-item>
+            <el-descriptions-item label="作者">{{ pv.authorName }} (UID {{ pv.authorId }})</el-descriptions-item>
+            <el-descriptions-item v-if="pv.title" label="标题">{{ pv.title }}</el-descriptions-item>
+          </el-descriptions>
+          <div v-if="pv.logo" class="pv-block">
+            <div class="pv-label">Logo</div>
+            <el-image :src="pv.logo" :preview-src-list="[pv.logo]" preview-teleported fit="cover" class="pv-logo" />
+          </div>
+          <div class="pv-block">
+            <div class="pv-label">正文</div>
+            <div class="pv-content">{{ pv.content || '(无文字内容)' }}</div>
+          </div>
+          <div v-if="pv.images.length" class="pv-block">
+            <div class="pv-label">图片({{ pv.images.length }})</div>
+            <div class="pv-imgs">
+              <el-image
+                v-for="img in pv.images"
+                :key="img"
+                :src="img"
+                :preview-src-list="pv.images"
+                preview-teleported
+                fit="cover"
+                class="pv-img"
+              />
+            </div>
+          </div>
+          <div class="pv-actions">
+            <el-button type="success" @click="decideFromPreview(true)">通过</el-button>
+            <el-button type="danger" @click="decideFromPreview(false)">驳回</el-button>
+          </div>
+        </template>
+      </div>
+    </el-drawer>
 
     <div class="pager">
       <el-button :disabled="page <= 1" @click="load(page - 1)">上一页</el-button>
@@ -104,6 +144,38 @@ function tagType(t: number) {
 }
 function fmtTime(ms: number) {
   return new Date(ms).toLocaleString('zh-CN')
+}
+
+interface AuditPreview {
+  kind: 'post' | 'comment' | 'software'
+  title: string
+  content: string
+  logo?: string
+  images: string[]
+  authorId: number
+  authorName: string
+}
+const pvDrawer = ref(false)
+const pvLoading = ref(false)
+const pvAudit = ref<AuditItem | null>(null)
+const pv = ref<AuditPreview | null>(null)
+
+async function preview(row: AuditItem) {
+  pvAudit.value = row
+  pv.value = null
+  pvDrawer.value = true
+  pvLoading.value = true
+  try {
+    pv.value = await api.auditPreview(row.id)
+  } finally {
+    pvLoading.value = false
+  }
+}
+
+async function decideFromPreview(approve: boolean) {
+  if (!pvAudit.value) return
+  await decide(pvAudit.value, approve)
+  pvDrawer.value = false
 }
 
 async function load(p: number) {
@@ -168,5 +240,44 @@ onMounted(() => load(1))
 }
 .plain-detail {
   color: var(--el-text-color-regular);
+}
+.pv-meta {
+  margin-bottom: 14px;
+}
+.pv-block {
+  margin-bottom: 14px;
+}
+.pv-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 6px;
+}
+.pv-content {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-lighter);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.pv-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+}
+.pv-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pv-img {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+}
+.pv-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
 }
 </style>
