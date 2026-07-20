@@ -7,7 +7,7 @@ SET NAMES utf8mb4;
 USE yiora;
 
 ALTER TABLE `admin_user`
-  ADD COLUMN `totp_secret`  VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'base32 密钥,空=未绑定' AFTER `must_change_pwd`,
+  ADD COLUMN `totp_secret`  VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'base32 密钥,空=未绑定' AFTER `status`,
   ADD COLUMN `totp_enabled` TINYINT     NOT NULL DEFAULT 0 COMMENT '1=已启用二步验证' AFTER `totp_secret`;
 
 CREATE TABLE `admin_recovery_code` (

@@ -8,6 +8,7 @@ import 'package:yiora/features/circle/model/circle.dart';
 import 'package:yiora/features/feed/model/post.dart';
 import 'package:yiora/features/publish/data/publish_repository.dart';
 import 'package:yiora/features/publish/model/post_draft.dart';
+import 'package:yiora/features/publish/model/software_draft.dart';
 import 'package:yiora/features/publish/view/publish_post_page.dart';
 
 class _FakePublishRepository implements PublishRepository {
@@ -18,6 +19,12 @@ class _FakePublishRepository implements PublishRepository {
 
   @override
   Future<List<String>> fetchHotTopics() async => const ['话题A', '话题B'];
+
+  @override
+  Future<void> publishSoftware(SoftwareDraft draft) async {}
+
+  @override
+  Future<List<String>> fetchSoftwareCategories(int type) async => const ['工具'];
 }
 
 class _FakeCircleRepository implements CircleRepository {
@@ -96,7 +103,7 @@ void main() {
     await _pumpPage(tester);
 
     await tester.enterText(
-      find.widgetWithText(TextField, '分享你的想法…'),
+      find.widgetWithText(TextField, '此刻的想法、见闻或故事…'),
       '这是一条测试动态',
     );
     await tester.pump();
@@ -117,11 +124,11 @@ void main() {
     final repo = await _pumpPage(tester);
 
     await tester.enterText(
-      find.widgetWithText(TextField, '标题（选填，好标题更容易被推荐）'),
+      find.widgetWithText(TextField, '添加标题让更多人看见'),
       '测试标题',
     );
     await tester.enterText(
-      find.widgetWithText(TextField, '分享你的想法…'),
+      find.widgetWithText(TextField, '此刻的想法、见闻或故事…'),
       '这是一条测试动态',
     );
     await _selectCircle(tester);
@@ -141,7 +148,7 @@ void main() {
     await _pumpPage(tester);
 
     await tester.enterText(
-      find.widgetWithText(TextField, '分享你的想法…'),
+      find.widgetWithText(TextField, '此刻的想法、见闻或故事…'),
       '要被重置的内容',
     );
     await tester.pump();
@@ -156,13 +163,16 @@ void main() {
     expect(button.onPressed, isNull);
   });
 
-  testWidgets('有内容点关闭弹出存草稿确认', (tester) async {
+  testWidgets('有内容点取消弹出存草稿确认', (tester) async {
     await _pumpPage(tester);
 
-    await tester.enterText(find.widgetWithText(TextField, '分享你的想法…'), '未完成的草稿');
+    await tester.enterText(
+      find.widgetWithText(TextField, '此刻的想法、见闻或故事…'),
+      '未完成的草稿',
+    );
     await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
 
     expect(find.text('保留本次编辑？'), findsOneWidget);

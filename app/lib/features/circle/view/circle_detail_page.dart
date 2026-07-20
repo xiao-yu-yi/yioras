@@ -181,113 +181,110 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Transform.translate(
-      offset: const Offset(0, -22),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1F2430).withValues(alpha: .06),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 白圈描边的圆形图标
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFFECEDF2),
-                      width: 1.2,
-                    ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1F2430).withValues(alpha: .06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 白圈描边的圆形图标
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFECEDF2),
+                    width: 1.2,
                   ),
-                  child: CircleIconAvatar(circle: circle, size: 52),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              circle.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
+                child: CircleIconAvatar(circle: circle, size: 52),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            circle.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (circle.isOfficial) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: PostCard.brandGradient,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '官方',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
                               ),
                             ),
                           ),
-                          if (circle.isOfficial) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: PostCard.brandGradient,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                '官方',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.2,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${formatCount(circle.memberCount)} 成员 · ${formatCount(circle.postCount)} 帖子',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.outline,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '${formatCount(circle.memberCount)} 成员 · ${formatCount(circle.postCount)} 帖子',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.outline,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                _JoinButton(circleId: circleId),
-              ],
-            ),
-            if (circle.intro.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                circle.intro,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  height: 1.5,
-                  color: scheme.onSurfaceVariant.withValues(alpha: .9),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 10),
+              _JoinButton(circleId: circleId),
             ],
+          ),
+          if (circle.intro.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              circle.intro,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.5,
+                color: scheme.onSurfaceVariant.withValues(alpha: .9),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

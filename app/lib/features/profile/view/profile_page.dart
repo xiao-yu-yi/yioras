@@ -23,6 +23,7 @@ class ProfilePage extends ConsumerWidget {
     if (user == null) return const SizedBox.shrink();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       endDrawer: const ProfileDrawer(),
       body: DefaultTabController(
         length: 2,
@@ -38,7 +39,18 @@ class ProfilePage extends ConsumerWidget {
                     Tab(text: '我的足迹'),
                   ],
                   labelColor: Theme.of(context).colorScheme.primary,
+                  unselectedLabelColor: Theme.of(context).colorScheme.outline,
+                  labelStyle: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                  ),
                   indicatorSize: TabBarIndicatorSize.label,
+                  indicatorWeight: 3,
+                  dividerColor: const Color(0xFFF0F1F5),
                 ),
               ),
             ),
@@ -50,11 +62,19 @@ class ProfilePage extends ConsumerWidget {
   }
 }
 
-/// 封面 + 头像资料 + 数据栏
+/// 大封面 + 悬浮胶囊操作钮 + 骑缝头像 + 资料区 + 数据栏（视觉对齐设计图）
 class _ProfileHeader extends ConsumerWidget {
   const _ProfileHeader({required this.user});
 
   final AuthUser user;
+
+  void _comingSoon(BuildContext context, String name, {String? suffix}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('「$name」${suffix ?? '正在开发中，敬请期待'}')),
+      );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,41 +83,100 @@ class _ProfileHeader extends ConsumerWidget {
 
     return Column(
       children: [
-        // 封面区（更换封面随编辑资料一起接入）
+        // 大封面区（浅色底 + 品牌水印占位，封面素材就绪后换图）+ 骑缝头像
         Stack(
           clipBehavior: Clip.none,
           children: [
             Container(
-              height: 150,
+              height: 300,
               width: double.infinity,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [scheme.primary, scheme.tertiary],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFEDF1FA), Color(0xFFFDFDFF)],
+                ),
+              ),
+              // 蓝紫渐变星形占位画（贴设计图的插画氛围，素材就绪后换图）
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(top: 74, child: _GradientStar(size: 128)),
+                  Positioned(
+                    top: 60,
+                    right: 118,
+                    child: _GradientStar(size: 38),
+                  ),
+                  Positioned(
+                    top: 190,
+                    left: 128,
+                    child: _GradientStar(size: 24),
+                  ),
+                ],
+              ),
+            ),
+            // 封面顶部淡昵称水印（贴设计图）
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  user.nickname,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1F2430).withValues(alpha: .16),
+                  ),
                 ),
               ),
             ),
             Positioned(
-              top: MediaQuery.paddingOf(context).top + 4,
-              right: 8,
-              child: Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Icons.menu, color: Colors.white),
-                  tooltip: '菜单',
-                  onPressed: () => Scaffold.of(context).openEndDrawer(),
-                ),
+              top: MediaQuery.paddingOf(context).top + 6,
+              left: 12,
+              child: _FrostedCircleButton(
+                icon: Icons.qr_code_scanner_rounded,
+                onTap: () => _comingSoon(context, '扫一扫'),
+              ),
+            ),
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 6,
+              right: 12,
+              child: Row(
+                children: [
+                  _FrostedCircleButton(
+                    icon: Icons.person_add_alt_rounded,
+                    onTap: () => _comingSoon(context, '添加好友'),
+                  ),
+                  const SizedBox(width: 8),
+                  Builder(
+                    builder: (context) => _FrostedCircleButton(
+                      icon: Icons.menu_rounded,
+                      onTap: () => Scaffold.of(context).openEndDrawer(),
+                    ),
+                  ),
+                ],
               ),
             ),
             Positioned(
               left: 16,
-              bottom: -32,
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: Colors.white,
+              bottom: -40,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1F2430).withValues(alpha: .1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: CircleAvatar(
-                  radius: 33,
-                  backgroundColor: scheme.primaryContainer,
+                  radius: 38,
+                  backgroundColor: const Color(0xFFEDF1FA),
                   foregroundImage: user.avatar.isEmpty
                       ? null
                       : CachedNetworkImageProvider(user.avatar),
@@ -105,91 +184,134 @@ class _ProfileHeader extends ConsumerWidget {
                     user.nickname.isEmpty
                         ? '?'
                         : user.nickname.characters.first,
-                    style: TextStyle(
-                      fontSize: 24,
-                      color: scheme.onPrimaryContainer,
-                    ),
+                    style: TextStyle(fontSize: 28, color: scheme.primary),
                   ),
                 ),
               ),
             ),
           ],
         ),
-        // 资料行
+        // 操作区（文档 3.8：编辑资料 / 更换封面 / 忧珠资产，VIP 已裁剪不做）
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              const SizedBox(width: 88),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            user.nickname,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: scheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Lv.${user.level}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: scheme.onPrimaryContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'ID: ${user.displayNo}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+              _PillButton(
+                label: '更换封面',
+                background: Colors.white,
+                foreground: const Color(0xFF3A4256),
+                bordered: true,
+                onTap: () => _comingSoon(context, '更换封面'),
               ),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(76, 32),
-                  visualDensity: VisualDensity.compact,
+              const SizedBox(width: 8),
+              _PillButton(
+                label: '忧珠资产',
+                background: const Color(0xFF273043),
+                foreground: Colors.white,
+                onTap: () => _comingSoon(context, '忧珠资产', suffix: '将在 M3 开放'),
+              ),
+              const SizedBox(width: 8),
+              _PillButton(
+                label: '编辑资料',
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF43F5E), Color(0xFFFF7849)],
                 ),
-                onPressed: () => context.push(Routes.editProfile),
-                child: const Text('编辑资料'),
+                foreground: Colors.white,
+                onTap: () => context.push(Routes.editProfile),
               ),
             ],
           ),
         ),
+        // 资料区：昵称 + Lv + 靓号 ID + 签名
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              user.signature.isEmpty ? '这个人很懒，什么都没留下' : user.signature,
-              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-            ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      user.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 深色 Lv 徽章（贴设计图）
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF273043),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Lv.${user.level}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFFFD666),
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F8),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      user.displayNo,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              GestureDetector(
+                onTap: () => context.push(Routes.editProfile),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        user.signature.isEmpty
+                            ? '填写个性签名，让大家认识你…'
+                            : user.signature,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: user.signature.isEmpty
+                              ? scheme.outline
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.edit_outlined, size: 13, color: scheme.outline),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         // 数据栏 5 项（文档 3.8：关注/粉丝/获赞/帖子/忧珠）
@@ -231,6 +353,109 @@ class _ProfileHeader extends ConsumerWidget {
   }
 }
 
+/// 蓝紫渐变四角星（封面占位插画元素）
+class _GradientStar extends StatelessWidget {
+  const _GradientStar({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [Color(0xFF2E5BFF), Color(0xFF8A5CFF)],
+      ).createShader(bounds),
+      child: Icon(Icons.auto_awesome_rounded, size: size, color: Colors.white),
+    );
+  }
+}
+
+/// 封面上的磨砂圆形小按钮（扫一扫/加好友/菜单）
+class _FrostedCircleButton extends StatelessWidget {
+  const _FrostedCircleButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .7),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1F2430).withValues(alpha: .08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(icon, size: 16, color: const Color(0xFF3A4256)),
+      ),
+    );
+  }
+}
+
+/// 悬浮小胶囊按钮（更换封面/编辑资料/我的资产）
+class _PillButton extends StatelessWidget {
+  const _PillButton({
+    required this.label,
+    required this.foreground,
+    required this.onTap,
+    this.background,
+    this.gradient,
+    this.bordered = false,
+  });
+
+  final String label;
+  final Color foreground;
+  final Color? background;
+  final Gradient? gradient;
+  final bool bordered;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: gradient == null ? background : null,
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(999),
+          border: bordered
+              ? Border.all(color: const Color(0xFFECEDF2), width: 1.2)
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1F2430).withValues(alpha: .08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: foreground,
+            height: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StatItem extends StatelessWidget {
   const _StatItem({
     required this.label,
@@ -265,18 +490,16 @@ class _StatItem extends StatelessWidget {
               Text(
                 formatCount(value),
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
                   color: highlight ? scheme.primary : scheme.onSurface,
+                  height: 1.2,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: TextStyle(fontSize: 11, color: scheme.outline),
               ),
             ],
           ),
@@ -295,8 +518,14 @@ class _MyPostsTab extends ConsumerWidget {
     final posts = ref.watch(myPostsProvider);
 
     return switch (posts) {
-      AsyncData(:final value) when value.isEmpty => const Center(
-        child: Text('还没有发布过内容'),
+      AsyncData(:final value) when value.isEmpty => Center(
+        child: Text(
+          '这里空空如也',
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
       ),
       AsyncData(:final value) => RefreshIndicator(
         onRefresh: () => ref.refresh(myPostsProvider.future),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../model/post_draft.dart';
+import '../model/software_draft.dart';
 import 'publish_api.dart';
 
 /// 发布仓库接口；统一抛 [ApiException]。
@@ -12,6 +13,12 @@ abstract interface class PublishRepository {
   Future<void> publishPost(PostDraft draft);
 
   Future<List<String>> fetchHotTopics();
+
+  /// 发布软件：内部完成 Logo/介绍图上传 → 创建软件（进入人工审核）
+  Future<void> publishSoftware(SoftwareDraft draft);
+
+  /// 软件分类（按发布类型：1 应用 / 2 游戏）
+  Future<List<String>> fetchSoftwareCategories(int type);
 }
 
 class PublishRepositoryHttp implements PublishRepository {
@@ -37,6 +44,32 @@ class PublishRepositoryHttp implements PublishRepository {
 
   @override
   Future<List<String>> fetchHotTopics() => _guard(_api.fetchHotTopics);
+
+  @override
+  Future<void> publishSoftware(SoftwareDraft draft) => _guard(() async {
+    final logoUrl = await _api.uploadImage(draft.logoPath);
+    final imageUrls = <String>[];
+    for (final path in draft.imagePaths) {
+      imageUrls.add(await _api.uploadImage(path));
+    }
+    await _api.createSoftware(
+      name: draft.name.trim(),
+      logoUrl: logoUrl,
+      intro: draft.intro.trim(),
+      imageUrls: imageUrls,
+      type: draft.type,
+      category: draft.category,
+      version: draft.version.trim(),
+      size: draft.size.trim(),
+      channel: draft.channel,
+      tags: draft.tags,
+      downloadUrl: draft.downloadUrl.trim(),
+    );
+  });
+
+  @override
+  Future<List<String>> fetchSoftwareCategories(int type) =>
+      _guard(() => _api.fetchSoftwareCategories(type));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
@@ -72,6 +105,22 @@ class PublishRepositoryMock implements PublishRepository {
       '搞机日常',
       '开源推荐',
     ];
+  }
+
+  @override
+  Future<void> publishSoftware(SoftwareDraft draft) async {
+    // Logo + 每张介绍图 300ms 模拟上传 + 600ms 创建
+    await Future<void>.delayed(
+      Duration(milliseconds: 900 + draft.imagePaths.length * 300),
+    );
+  }
+
+  @override
+  Future<List<String>> fetchSoftwareCategories(int type) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    return type == 1
+        ? const ['工具', '影音', '社交', '学习', '效率', '美化']
+        : const ['休闲', '角色扮演', '策略', '动作', '模拟经营'];
   }
 }
 

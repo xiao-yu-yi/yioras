@@ -17,6 +17,7 @@ import '../../features/profile/view/edit_profile_page.dart';
 import '../../features/profile/view/profile_page.dart';
 import '../../features/profile/view/settings_page.dart';
 import '../../features/publish/view/publish_post_page.dart';
+import '../../features/publish/view/publish_software_page.dart';
 import '../../features/shell/main_shell.dart';
 import '../../features/user/view/user_profile_page.dart';
 import 'routes.dart';
@@ -67,6 +68,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.publishPost,
         builder: (context, state) => const PublishPostPage(),
+      ),
+      GoRoute(
+        path: Routes.publishSoftware,
+        builder: (context, state) => const PublishSoftwarePage(),
       ),
       GoRoute(
         path: Routes.postDetail,

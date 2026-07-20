@@ -45,16 +45,15 @@ function AdminLogin($username, $password) {
     return PostJson "$adm/login" @{username = $username; password = $password; captchaId = $cap.captchaId; captchaCode = $cap.captchaCode} $null
 }
 
-# 1. admin login: no/bad captcha rejected, bad pwd rejected, ok login carries mustChangePwd
+# 1. admin login: no/bad captcha rejected, bad pwd rejected
 $noCaptcha = PostJson "$adm/login" @{username = "admin"; password = "admin123"} $null
 $badLogin = AdminLogin "admin" "wrong"
 $login = AdminLogin "admin" "admin123"
 $ha = @{Authorization = "Bearer $($login.data.token)"}
 $userTokenTry = Invoke-RestMethod "$adm/audits" -Headers $h1
-Write-Output ("[1] noCaptcha=code$($noCaptcha.code) (expect 40000) badLogin=code$($badLogin.code) login=code$($login.code) mustChangePwd=$($login.data.mustChangePwd) perms=" + ($login.data.perms -join ',') + " userTokenOnAdmin=code$($userTokenTry.code) (expect 40100)")
+Write-Output ("[1] noCaptcha=code$($noCaptcha.code) (expect 40000) badLogin=code$($badLogin.code) login=code$($login.code) perms=" + ($login.data.perms -join ',') + " userTokenOnAdmin=code$($userTokenTry.code) (expect 40100)")
 
-# 1.5 forced password change flow + admin account management (create/assign role/disable/reset)
-$blocked = Invoke-RestMethod "$adm/audits" -Headers $ha  # must_change_pwd=1 hard-blocks everything but /password
+# 1.5 password change + admin account management (create/assign role/disable/reset)
 $weak = PostJson "$adm/password" @{oldPassword = "admin123"; newPassword = "short"} $ha
 $chg = PostJson "$adm/password" @{oldPassword = "admin123"; newPassword = "Admin#2026pwd"} $ha
 $reLogin = AdminLogin "admin" "Admin#2026pwd"
@@ -65,14 +64,13 @@ $mk = PostJson "$adm/admins" @{username = "auditor1"; password = "Auditor1pwd"; 
 $dupUser = PostJson "$adm/admins" @{username = "auditor1"; password = "Auditor1pwd"; roleId = $auditorRole.id} $ha
 $la2 = AdminLogin "auditor1" "Auditor1pwd"
 $ha2 = @{Authorization = "Bearer $($la2.data.token)"}
-PostJson "$adm/password" @{oldPassword = "Auditor1pwd"; newPassword = "Auditor1pwd2"} $ha2 | Out-Null
 $permDeny = Invoke-RestMethod "$adm/admins" -Headers $ha2
 $selfOp = PostJson "$adm/admins/1" @{status = 0} $ha  # initial admin (id=1) operating itself
 $disable = PostJson "$adm/admins/$($mk.data.id)" @{status = 0} $ha
-$disabledLogin = AdminLogin "auditor1" "Auditor1pwd2"
+$disabledLogin = AdminLogin "auditor1" "Auditor1pwd"
 PostJson "$adm/admins/$($mk.data.id)" @{status = 1; newPassword = "Auditor2pwd"} $ha | Out-Null
 $resetLogin = AdminLogin "auditor1" "Auditor2pwd"
-Write-Output "[1.5] preChangeBlocked=code$($blocked.code) (expect 40300) weakPwd=code$($weak.code) (expect 40000) change=code$($chg.code) reLogin mustChange=$($reLogin.data.mustChangePwd) (expect False); roles=$(@($roles).Count) create=code$($mk.code) dup=code$($dupUser.code) auditorMustChange=$($la2.data.mustChangePwd) (expect True) permDeny=code$($permDeny.code) (expect 40300) selfOp=code$($selfOp.code) (expect 40300) disable=code$($disable.code) disabledLogin=code$($disabledLogin.code) (expect 40300) resetLogin resetMustChange=$($resetLogin.data.mustChangePwd) (expect True)"
+Write-Output "[1.5] weakPwd=code$($weak.code) (expect 40000) change=code$($chg.code) reLogin=code$($reLogin.code); roles=$(@($roles).Count) create=code$($mk.code) dup=code$($dupUser.code) (expect 42900) auditorLogin=code$($la2.code) permDeny=code$($permDeny.code) (expect 40300) selfOp=code$($selfOp.code) (expect 40300) disable=code$($disable.code) disabledLogin=code$($disabledLogin.code) (expect 40300) resetLogin=code$($resetLogin.code)"
 
 # 1.8 login fail lockout: 5 wrong passwords (with valid captchas) lock the account for 15 min
 for ($i = 0; $i -lt 5; $i++) { AdminLogin "auditor1" "definitely-wrong" | Out-Null }
@@ -80,7 +78,7 @@ $lockedRight = AdminLogin "auditor1" "Auditor2pwd"   # correct password but lock
 $failTtl = (docker exec yiora-redis-1 redis-cli TTL "admin:login:fail:auditor1").Trim()
 docker exec yiora-redis-1 redis-cli DEL "admin:login:fail:auditor1" | Out-Null
 $unlocked = AdminLogin "auditor1" "Auditor2pwd"
-Write-Output "[1.8] lockedEvenRightPwd=code$($lockedRight.code) (expect 40300) ttl=$failTtl(<=900) afterUnlock=code$($unlocked.code) mustChange=$($unlocked.data.mustChangePwd)"
+Write-Output "[1.8] lockedEvenRightPwd=code$($lockedRight.code) (expect 40300) ttl=$failTtl(<=900) afterUnlock=code$($unlocked.code)"
 
 # 1.95 TOTP two-factor: setup -> confirm -> re-login needs ticket+code -> replay blocked -> recovery code -> disable
 $setup = (Invoke-RestMethod -Method Post -Uri "$adm/totp/setup" -Headers $ha).data

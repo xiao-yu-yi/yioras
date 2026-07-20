@@ -412,13 +412,12 @@ type AdminLoginReq struct {
 }
 
 type AdminLoginResp struct {
-	Token         string   `json:"token"`
-	ExpireAt      int64    `json:"expireAt"`
-	Username      string   `json:"username"`
-	Perms         []string `json:"perms"`
-	MustChangePwd bool     `json:"mustChangePwd"`          // true=首登/重置后必须先改密
-	TotpRequired  bool     `json:"totpRequired,omitempty"` // true=还需二步验证,用 ticket 换 token
-	Ticket        string   `json:"ticket,omitempty"`       // 二步验证临时票据(5 分钟)
+	Token        string   `json:"token"`
+	ExpireAt     int64    `json:"expireAt"`
+	Username     string   `json:"username"`
+	Perms        []string `json:"perms"`
+	TotpRequired bool     `json:"totpRequired,omitempty"` // true=还需二步验证,用 ticket 换 token
+	Ticket       string   `json:"ticket,omitempty"`       // 二步验证临时票据(5 分钟)
 }
 
 type AdminTotpLoginReq struct {
@@ -452,13 +451,12 @@ type AdminChangePwdReq struct {
 }
 
 type AdminAccountItem struct {
-	ID            int64  `json:"id"`
-	Username      string `json:"username"`
-	RoleID        int64  `json:"roleId"`
-	RoleName      string `json:"roleName"`
-	Status        int64  `json:"status"` // 1正常 0停用
-	MustChangePwd bool   `json:"mustChangePwd"`
-	LastLoginAt   int64  `json:"lastLoginAt"` // 0=从未登录
+	ID          int64  `json:"id"`
+	Username    string `json:"username"`
+	RoleID      int64  `json:"roleId"`
+	RoleName    string `json:"roleName"`
+	Status      int64  `json:"status"`      // 1正常 0停用
+	LastLoginAt int64  `json:"lastLoginAt"` // 0=从未登录
 }
 
 type AdminCreateAccountReq struct {

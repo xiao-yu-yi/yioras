@@ -48,6 +48,53 @@ class PublishApi {
     ApiResponse.fromJson(resp.data!, (_) => null).unwrap();
   }
 
+  /// POST /software 发软件（发布后进入人工审核，上架后公开可见）
+  Future<void> createSoftware({
+    required String name,
+    required String logoUrl,
+    required String intro,
+    required List<String> imageUrls,
+    required int type,
+    required String category,
+    required String version,
+    required String size,
+    required String channel,
+    required List<String> tags,
+    required String downloadUrl,
+  }) async {
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/software',
+      data: {
+        'name': name,
+        'logo': logoUrl,
+        'intro': intro,
+        'images': imageUrls,
+        'type': type,
+        'category': category,
+        'version': version,
+        'size': size,
+        'channel': channel,
+        'tags': tags,
+        'downloadUrl': downloadUrl,
+      },
+    );
+    ApiResponse.fromJson(resp.data!, (_) => null).unwrap();
+  }
+
+  /// GET /software/categories?type= 软件分类（发布器分类 chips 数据源）
+  Future<List<String>> fetchSoftwareCategories(int type) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '${AppConfig.apiPrefix}/software/categories',
+      queryParameters: {'type': type},
+    );
+    return ApiResponse.fromJson(
+      resp.data!,
+      (data) => ((data as Map<String, dynamic>)['list'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
+    ).unwrap();
+  }
+
   /// GET /topics/hot 热门话题（话题选择器数据源）
   Future<List<String>> fetchHotTopics() async {
     final resp = await _dio.get<Map<String, dynamic>>(

@@ -13,14 +13,13 @@ import (
 
 type (
 	AdminUser struct {
-		ID            int64  `db:"id"`
-		Username      string `db:"username"`
-		PasswordHash  string `db:"password_hash"`
-		RoleID        int64  `db:"role_id"`
-		Status        int64  `db:"status"`
-		MustChangePwd int64  `db:"must_change_pwd"`
-		TotpSecret    string `db:"totp_secret"`
-		TotpEnabled   int64  `db:"totp_enabled"`
+		ID           int64  `db:"id"`
+		Username     string `db:"username"`
+		PasswordHash string `db:"password_hash"`
+		RoleID       int64  `db:"role_id"`
+		Status       int64  `db:"status"`
+		TotpSecret   string `db:"totp_secret"`
+		TotpEnabled  int64  `db:"totp_enabled"`
 	}
 
 	AuditItem struct {
@@ -38,7 +37,7 @@ type (
 
 func NewAdminModel(conn sqlx.SqlConn) *AdminModel { return &AdminModel{conn: conn} }
 
-const adminUserCols = "id, username, password_hash, role_id, status, must_change_pwd, totp_secret, totp_enabled"
+const adminUserCols = "id, username, password_hash, role_id, status, totp_secret, totp_enabled"
 
 func (m *AdminModel) FindByUsername(ctx context.Context, username string) (*AdminUser, error) {
 	var a AdminUser
@@ -116,10 +115,10 @@ func (m *AdminModel) RecoveryCodesLeft(ctx context.Context, adminID int64) (int6
 	return n, err
 }
 
-// UpdateAdminPassword 管理员改密,清除强制改密标记。
+// UpdateAdminPassword 管理员改密。
 func (m *AdminModel) UpdateAdminPassword(ctx context.Context, adminID int64, hash string) error {
 	if _, err := m.conn.ExecCtx(ctx,
-		"UPDATE `admin_user` SET password_hash = ?, must_change_pwd = 0 WHERE id = ?", hash, adminID); err != nil {
+		"UPDATE `admin_user` SET password_hash = ? WHERE id = ?", hash, adminID); err != nil {
 		return fmt.Errorf("update admin password: %w", err)
 	}
 	return nil
@@ -127,19 +126,18 @@ func (m *AdminModel) UpdateAdminPassword(ctx context.Context, adminID int64, has
 
 // AdminAccountRow 账号管理列表行。
 type AdminAccountRow struct {
-	ID            int64        `db:"id"`
-	Username      string       `db:"username"`
-	RoleID        int64        `db:"role_id"`
-	RoleName      string       `db:"role_name"`
-	Status        int64        `db:"status"`
-	MustChangePwd int64        `db:"must_change_pwd"`
-	LastLoginAt   sql.NullTime `db:"last_login_at"`
+	ID          int64        `db:"id"`
+	Username    string       `db:"username"`
+	RoleID      int64        `db:"role_id"`
+	RoleName    string       `db:"role_name"`
+	Status      int64        `db:"status"`
+	LastLoginAt sql.NullTime `db:"last_login_at"`
 }
 
 func (m *AdminModel) ListAdmins(ctx context.Context) ([]*AdminAccountRow, error) {
 	var rows []*AdminAccountRow
 	err := m.conn.QueryRowsCtx(ctx, &rows,
-		`SELECT a.id, a.username, a.role_id, COALESCE(r.name, '') AS role_name, a.status, a.must_change_pwd, a.last_login_at
+		`SELECT a.id, a.username, a.role_id, COALESCE(r.name, '') AS role_name, a.status, a.last_login_at
 		 FROM admin_user a LEFT JOIN admin_role r ON r.id = a.role_id ORDER BY a.id`)
 	if err != nil {
 		return nil, err
@@ -147,10 +145,10 @@ func (m *AdminModel) ListAdmins(ctx context.Context) ([]*AdminAccountRow, error)
 	return rows, nil
 }
 
-// CreateAdmin 新建后台账号(首登强制改密)。用户名撞唯一键返回 ErrAdminExists。
+// CreateAdmin 新建后台账号。用户名撞唯一键返回 ErrAdminExists。
 func (m *AdminModel) CreateAdmin(ctx context.Context, username, hash string, roleID int64) (int64, error) {
 	r, err := m.conn.ExecCtx(ctx,
-		"INSERT IGNORE INTO `admin_user` (username, password_hash, role_id, must_change_pwd) VALUES (?, ?, ?, 1)",
+		"INSERT IGNORE INTO `admin_user` (username, password_hash, role_id) VALUES (?, ?, ?)",
 		username, hash, roleID)
 	if err != nil {
 		return 0, fmt.Errorf("create admin: %w", err)
@@ -176,7 +174,7 @@ func (m *AdminModel) UpdateAdmin(ctx context.Context, id, roleID, status int64, 
 		args = append(args, status)
 	}
 	if hash != "" {
-		sets = append(sets, "password_hash = ?", "must_change_pwd = 1")
+		sets = append(sets, "password_hash = ?")
 		args = append(args, hash)
 	}
 	if len(sets) == 0 {

@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { uploadFile } from '../api'
+import { uploadFile } from '@/api/yiora'
 
 const props = defineProps<{ modelValue: string; kind: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()

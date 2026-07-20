@@ -48,13 +48,6 @@ func adminAuth(svcCtx *svc.ServiceContext, perm string, next func(w http.Respons
 			resp.Error(w, r, xerr.New(xerr.CodeUnauthorized, "后台登录已失效"))
 			return
 		}
-		// 强制改密硬拦截:标记未清除前仅放行改密接口(防 API 直连绕过前端引导)
-		if r.URL.Path != "/admin/v1/password" {
-			if a, err := svcCtx.AdminModel.FindAdminByID(r.Context(), adminID); err == nil && a.MustChangePwd == 1 {
-				resp.Error(w, r, xerr.New(xerr.CodeForbidden, "首次登录请先修改初始密码"))
-				return
-			}
-		}
 		if perm != "" {
 			if err := adminlogic.New(svcCtx).RequirePerm(r.Context(), roleID, perm); err != nil {
 				resp.Error(w, r, err)

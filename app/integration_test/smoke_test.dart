@@ -38,10 +38,10 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     await _pumpUntil(tester, find.text('发动态'));
     await tester.tap(find.text('发动态'));
-    await _pumpUntil(tester, find.text('分享你的想法…'));
+    await _pumpUntil(tester, find.text('此刻的想法、见闻或故事…'));
 
     await tester.enterText(
-      find.widgetWithText(TextField, '分享你的想法…'),
+      find.widgetWithText(TextField, '此刻的想法、见闻或故事…'),
       '冒烟测试动态内容',
     );
     await tester.pump();

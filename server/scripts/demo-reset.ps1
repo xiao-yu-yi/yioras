@@ -17,7 +17,7 @@ if (-not $api) {
 
 # 2. reset the initial admin account (bcrypt of 'admin123', same hash as 008 seed)
 $sql = @(
-    "UPDATE admin_user SET password_hash='`$2a`$10`$ZhCQV.pW8YeGEoDGbNHrWujUGjBYHxKunSD70uW0B7LbutEjed7vK', must_change_pwd=1, totp_secret='', totp_enabled=0 WHERE username='admin';",
+    "UPDATE admin_user SET password_hash='`$2a`$10`$ZhCQV.pW8YeGEoDGbNHrWujUGjBYHxKunSD70uW0B7LbutEjed7vK', totp_secret='', totp_enabled=0 WHERE username='admin';",
     "DELETE FROM admin_recovery_code WHERE admin_id = (SELECT id FROM (SELECT id FROM admin_user WHERE username='admin') t);"
 ) -join ' '
 # mysql prints a password warning to stderr; don't let EAP=Stop turn it into a failure
@@ -30,13 +30,13 @@ $keys = docker exec yiora-redis-1 redis-cli --scan --pattern "admin:*" 2>$null
 if ($keys) { $keys | ForEach-Object { docker exec yiora-redis-1 redis-cli DEL $_ | Out-Null } }
 
 # 4. verify
-$row = docker exec yiora-mysql-1 mysql -uroot -proot123 yiora -N -e "SELECT username, must_change_pwd, totp_enabled FROM admin_user WHERE username='admin';" 2>$null
+$row = docker exec yiora-mysql-1 mysql -uroot -proot123 yiora -N -e "SELECT username, totp_enabled FROM admin_user WHERE username='admin';" 2>$null
 $ErrorActionPreference = 'Stop'
-Write-Output "admin state: $row (expect: admin 1 0)"
+Write-Output "admin state: $row (expect: admin 0)"
 Write-Output ""
 Write-Output "demo ready ->"
-Write-Output "  console  : http://localhost:5173   (cd admin-web; npm run dev)"
-Write-Output "  account  : admin / admin123        (captcha required; forced password change on first login)"
+Write-Output "  console  : http://localhost:8848   (cd admin-web; pnpm dev)"
+Write-Output "  account  : admin / admin123        (captcha required)"
 Write-Output "  minio ui : http://localhost:9001   (yiora-minio / yiora-minio-secret)"
-Write-Output "  suggested tour: change password -> Security page bind TOTP -> Banner upload widget -> MinIO bucket"
+Write-Output "  suggested tour: Security page bind TOTP -> Banner upload widget -> MinIO bucket"
 Write-Output "DEMO_RESET_DONE"

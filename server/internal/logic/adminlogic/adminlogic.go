@@ -137,7 +137,6 @@ func (l *Logic) issueToken(ctx context.Context, a *model.AdminUser) (*types.Admi
 	l.svcCtx.AdminModel.TouchLogin(ctx, a.ID)
 	return &types.AdminLoginResp{
 		Token: token, ExpireAt: expireAt, Username: a.Username, Perms: perms,
-		MustChangePwd: a.MustChangePwd == 1,
 	}, nil
 }
 
@@ -348,7 +347,7 @@ func (l *Logic) Admins(ctx context.Context) ([]types.AdminAccountItem, error) {
 	for _, a := range rows {
 		item := types.AdminAccountItem{
 			ID: a.ID, Username: a.Username, RoleID: a.RoleID, RoleName: a.RoleName,
-			Status: a.Status, MustChangePwd: a.MustChangePwd == 1,
+			Status: a.Status,
 		}
 		if a.LastLoginAt.Valid {
 			item.LastLoginAt = a.LastLoginAt.Time.UnixMilli()

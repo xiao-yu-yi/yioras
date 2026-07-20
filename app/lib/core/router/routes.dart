@@ -12,6 +12,7 @@ abstract final class Routes {
   // 全屏页
   static const circleDetail = '/circles/:id';
   static const publishPost = '/publish/post';
+  static const publishSoftware = '/publish/software';
   static const postDetail = '/posts/:id';
   static const notifications = '/notifications/:type';
   static const chat = '/chat/:id';
