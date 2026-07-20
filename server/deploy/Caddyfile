@@ -1,0 +1,23 @@
+# Yiora 反向代理:自动 HTTPS(Let's Encrypt),对外仅暴露 Caddy
+# API:  https://{$API_DOMAIN}  -> api:8888
+# WS:   wss://{$WS_DOMAIN}/ws  -> ws:8889 (WebSocket 自动透传 Upgrade)
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy api:8888
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+}
+
+{$WS_DOMAIN} {
+	@internal path /internal/*
+	respond @internal 403 # 内部推送端口路径禁止公网访问
+
+	reverse_proxy ws:8889
+}

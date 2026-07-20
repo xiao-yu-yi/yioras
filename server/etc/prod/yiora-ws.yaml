@@ -1,0 +1,7 @@
+# 生产配置:密钥经环境变量注入(conf.UseEnv)
+Addr: 0.0.0.0:8889
+
+Auth:
+  AccessSecret: ${YIORA_JWT_SECRET} # 必须与 yiora-api 一致
+
+InternalToken: ${YIORA_INTERNAL_TOKEN} # 与 api WsPush.Token 一致

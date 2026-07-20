@@ -1,0 +1,6 @@
+Addr: 0.0.0.0:8889
+
+Auth:
+  AccessSecret: change-me-to-a-long-random-secret # 必须与 yiora-api.yaml 一致
+
+InternalToken: change-me-internal-push-token # 与 yiora-api.yaml WsPush.Token 一致

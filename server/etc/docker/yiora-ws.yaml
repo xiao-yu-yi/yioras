@@ -1,0 +1,6 @@
+Addr: 0.0.0.0:8889
+
+Auth:
+  AccessSecret: compose-dev-secret-do-not-use-in-prod # 必须与 yiora-api.yaml 一致
+
+InternalToken: compose-dev-internal-token # 与 yiora-api.yaml WsPush.Token 一致

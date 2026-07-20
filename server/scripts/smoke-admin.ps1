@@ -1,0 +1,224 @@
+﻿# Admin smoke: login + audit workbench (post/comment/software) + cert decide + appoint + oplogs
+# Run AFTER smoke-p2 (has pending post from re-audit + b as circle owner)
+$ErrorActionPreference = 'Stop'
+$api = "http://localhost:8888/api/v1"
+$adm = "http://localhost:8888/admin/v1"
+
+function PostJson($uri, $obj, $headers) {
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json -Compress -Depth 5))
+    if ($headers) { return Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ContentType 'application/json; charset=utf-8' -Body $bytes }
+    return Invoke-RestMethod -Method Post -Uri $uri -ContentType 'application/json; charset=utf-8' -Body $bytes
+}
+
+$la = PostJson "$api/auth/login" @{email = "a@test.com"; password = "pass1234"} $null
+$lb = PostJson "$api/auth/login" @{email = "b@test.com"; password = "pass1234"} $null
+$h1 = @{Authorization = "Bearer $($la.data.token)"}
+$h2 = @{Authorization = "Bearer $($lb.data.token)"}
+$uidB = $lb.data.userId
+
+# SolveCaptcha: fetch captcha then read the answer straight from redis (full real flow, no backdoor)
+function SolveCaptcha() {
+    $c = (Invoke-RestMethod "$adm/captcha").data
+    $code = (docker exec yiora-redis-1 redis-cli GET "admin:captcha:$($c.captchaId)").Trim()
+    return @{captchaId = $c.captchaId; captchaCode = $code}
+}
+function AdminLogin($username, $password) {
+    $cap = SolveCaptcha
+    return PostJson "$adm/login" @{username = $username; password = $password; captchaId = $cap.captchaId; captchaCode = $cap.captchaCode} $null
+}
+
+# 1. admin login: no/bad captcha rejected, bad pwd rejected, ok login carries mustChangePwd
+$noCaptcha = PostJson "$adm/login" @{username = "admin"; password = "admin123"} $null
+$badLogin = AdminLogin "admin" "wrong"
+$login = AdminLogin "admin" "admin123"
+$ha = @{Authorization = "Bearer $($login.data.token)"}
+$userTokenTry = Invoke-RestMethod "$adm/audits" -Headers $h1
+Write-Output ("[1] noCaptcha=code$($noCaptcha.code) (expect 40000) badLogin=code$($badLogin.code) login=code$($login.code) mustChangePwd=$($login.data.mustChangePwd) perms=" + ($login.data.perms -join ',') + " userTokenOnAdmin=code$($userTokenTry.code) (expect 40100)")
+
+# 1.5 forced password change flow + admin account management (create/assign role/disable/reset)
+$blocked = Invoke-RestMethod "$adm/audits" -Headers $ha  # must_change_pwd=1 hard-blocks everything but /password
+$weak = PostJson "$adm/password" @{oldPassword = "admin123"; newPassword = "short"} $ha
+$chg = PostJson "$adm/password" @{oldPassword = "admin123"; newPassword = "Admin#2026pwd"} $ha
+$reLogin = AdminLogin "admin" "Admin#2026pwd"
+$ha = @{Authorization = "Bearer $($reLogin.data.token)"}
+$roles = (Invoke-RestMethod "$adm/roles" -Headers $ha).data
+$auditorRole = @($roles | Where-Object { $_.perms -contains 'audit' -and $_.perms -notcontains '*' })[0]
+$mk = PostJson "$adm/admins" @{username = "auditor1"; password = "Auditor1pwd"; roleId = $auditorRole.id} $ha
+$dupUser = PostJson "$adm/admins" @{username = "auditor1"; password = "Auditor1pwd"; roleId = $auditorRole.id} $ha
+$la2 = AdminLogin "auditor1" "Auditor1pwd"
+$ha2 = @{Authorization = "Bearer $($la2.data.token)"}
+PostJson "$adm/password" @{oldPassword = "Auditor1pwd"; newPassword = "Auditor1pwd2"} $ha2 | Out-Null
+$permDeny = Invoke-RestMethod "$adm/admins" -Headers $ha2
+$selfOp = PostJson "$adm/admins/1" @{status = 0} $ha  # initial admin (id=1) operating itself
+$disable = PostJson "$adm/admins/$($mk.data.id)" @{status = 0} $ha
+$disabledLogin = AdminLogin "auditor1" "Auditor1pwd2"
+PostJson "$adm/admins/$($mk.data.id)" @{status = 1; newPassword = "Auditor2pwd"} $ha | Out-Null
+$resetLogin = AdminLogin "auditor1" "Auditor2pwd"
+Write-Output "[1.5] preChangeBlocked=code$($blocked.code) (expect 40300) weakPwd=code$($weak.code) (expect 40000) change=code$($chg.code) reLogin mustChange=$($reLogin.data.mustChangePwd) (expect False); roles=$(@($roles).Count) create=code$($mk.code) dup=code$($dupUser.code) auditorMustChange=$($la2.data.mustChangePwd) (expect True) permDeny=code$($permDeny.code) (expect 40300) selfOp=code$($selfOp.code) (expect 40300) disable=code$($disable.code) disabledLogin=code$($disabledLogin.code) (expect 40300) resetLogin resetMustChange=$($resetLogin.data.mustChangePwd) (expect True)"
+
+# 1.8 login fail lockout: 5 wrong passwords (with valid captchas) lock the account for 15 min
+for ($i = 0; $i -lt 5; $i++) { AdminLogin "auditor1" "definitely-wrong" | Out-Null }
+$lockedRight = AdminLogin "auditor1" "Auditor2pwd"   # correct password but locked
+$failTtl = (docker exec yiora-redis-1 redis-cli TTL "admin:login:fail:auditor1").Trim()
+docker exec yiora-redis-1 redis-cli DEL "admin:login:fail:auditor1" | Out-Null
+$unlocked = AdminLogin "auditor1" "Auditor2pwd"
+Write-Output "[1.8] lockedEvenRightPwd=code$($lockedRight.code) (expect 40300) ttl=$failTtl(<=900) afterUnlock=code$($unlocked.code) mustChange=$($unlocked.data.mustChangePwd)"
+
+# 2. seed pending items: post with REVIEW word by a; comment with REVIEW word by b; software+version by b
+$pp = PostJson "$api/posts" @{circleId = 2; title = "audit me"; content = "hello REVIEWWORD_SAMPLE"} $h1
+$target = PostJson "$api/posts" @{circleId = 2; content = "comment target"} $h1
+$pc = PostJson "$api/comments" @{postId = $target.data.postId; content = "cmt REVIEWWORD_SAMPLE"} $h2
+$cats = (Invoke-RestMethod "$api/software/categories?type=1").data
+$ps = PostJson "$api/software" @{name = "AuditSoft"; logo = "https://c/l.png"; intro = "intro"; images = @("https://c/1.jpg","https://c/2.jpg","https://c/3.jpg"); type = 1; categoryId = $cats[0].id; version = "1.0"; size = "1MB"; downloadUrl = "https://pan/x"} $h2
+Write-Output "[2] pendPost=$($pp.data.postId)/s$($pp.data.status) pendCmt=$($pc.data.commentId)/s$($pc.data.status) pendSoft=$($ps.data.softwareId)/s$($ps.data.status)"
+
+# 3. audit queue lists all three
+$audits = (Invoke-RestMethod "$adm/audits" -Headers $ha).data
+Write-Output ("[3] queue=" + (($audits | ForEach-Object { "a$($_.id)t$($_.bizType)" }) -join ' '))
+
+# 4. approve post -> guest visible + circle count; reject comment -> stays hidden; approve software -> online + latest_version_id
+$aPost = @($audits | Where-Object { $_.bizType -eq 1 -and $_.bizId -eq $pp.data.postId })[0]
+$aCmt = @($audits | Where-Object { $_.bizType -eq 2 -and $_.bizId -eq $pc.data.commentId })[0]
+$aSoft = @($audits | Where-Object { $_.bizType -eq 3 -and $_.bizId -eq $ps.data.softwareId })[0]
+if (-not $aPost -or -not $aCmt -or -not $aSoft) { throw "expected audits missing from queue" }
+$d1 = PostJson "$adm/audits/$($aPost.id)/decide" @{approve = $true} $ha
+$d1b = PostJson "$adm/audits/$($aPost.id)/decide" @{approve = $true} $ha
+$d2 = PostJson "$adm/audits/$($aCmt.id)/decide" @{approve = $false; reason = "violation"} $ha
+$d3 = PostJson "$adm/audits/$($aSoft.id)/decide" @{approve = $true} $ha
+$gp = Invoke-RestMethod "$api/posts/$($pp.data.postId)"
+$cl = (Invoke-RestMethod "$api/comments?postId=$($target.data.postId)").data
+$sd = (Invoke-RestMethod "$api/software/$($ps.data.softwareId)").data
+Write-Output "[4] post=code$($d1.code) redecide=code$($d1b.code) cmtReject=code$($d2.code) soft=code$($d3.code); guestPost=code$($gp.code) hiddenCmt=$(@($cl).Count) softVer=$($sd.version) softStatus=$($sd.status)"
+
+# 5. author notifications for audit results
+$n1 = (Invoke-RestMethod "$api/notifications?type=3" -Headers $h1).data | Select-Object -First 1
+Write-Output "[5] author notify=[$($n1.content)]"
+
+# 6. cert workbench: b submits -> admin approves -> b profile certs
+PostJson "$api/certifications" @{kind = 1; material = "portfolio links"} $h2 | Out-Null
+$certs = (Invoke-RestMethod "$adm/certifications" -Headers $ha).data
+$cid = ($certs | Where-Object { $_.userId -eq $uidB })[0].id
+$dc = PostJson "$adm/certifications/$cid/decide" @{approve = $true} $ha
+$profB = (Invoke-RestMethod "$api/users/$uidB").data
+Write-Output ("[6] certQueue=$(@($certs).Count) decide=code$($dc.code) bCerts=" + ($profB.certs -join ','))
+
+# 7. appoint: admin makes b member of circle 3 owner -> b can manage circle 3
+$ap = PostJson "$adm/circles/3/appoint" @{userId = $uidB; role = 2} $ha
+$c3post = PostJson "$api/posts" @{circleId = 3; content = "circle3 post"} $h1
+$adminTop = PostJson "$api/circles/3/admin/top" @{postId = $c3post.data.postId; on = $true} $h2
+Write-Output "[7] appoint=code$($ap.code) bManageCircle3=code$($adminTop.code)"
+
+# 8. notice broadcast: every active user gets system notification
+$beforeN = (Invoke-RestMethod "$api/notifications/unread" -Headers $h1).data.system
+PostJson "$adm/notices" @{title = "maintenance tonight"; content = "server upgrade at 2am"} $ha | Out-Null
+$afterN = (Invoke-RestMethod "$api/notifications/unread" -Headers $h1).data.system
+Write-Output "[8] notice fanout: a.system $beforeN -> $afterN (expect +1)"
+
+# 8.5 user search list: keyword by nickname/email + status filter + paging total
+$us1 = (Invoke-RestMethod "$adm/users?keyword=BobB" -Headers $ha).data
+$us2 = (Invoke-RestMethod "$adm/users?keyword=b%40test.com" -Headers $ha).data
+$usAll = (Invoke-RestMethod "$adm/users?page=1&size=2" -Headers $ha).data
+Write-Output "[8.5] userSearch nick=$($us1.total) email=$($us2.total) (expect 1/1) all.total=$($usAll.total) page1=$(@($usAll.list).Count)"
+
+# 9. mute user b globally -> post/comment/im blocked, browse ok, status visible in list -> restore
+$mute = PostJson "$adm/users/$uidB/ban" @{action = 2; days = 1} $ha
+$mp = PostJson "$api/posts" @{circleId = 2; content = "muted global"} $h2
+$mc = PostJson "$api/comments" @{postId = $target.data.postId; content = "muted cmt"} $h2
+$browse = (Invoke-RestMethod "$api/posts" -Headers $h2).code
+$mutedList = (Invoke-RestMethod "$adm/users?status=2" -Headers $ha).data
+PostJson "$adm/users/$uidB/ban" @{action = 0} $ha | Out-Null
+$mp2 = PostJson "$api/posts" @{circleId = 2; content = "recovered"} $h2
+Write-Output "[9] mute=code$($mute.code) post=code$($mp.code) cmt=code$($mc.code) (expect 40300x2) browse=code$browse statusFilter=$($mutedList.total)(expect 1) restorePost=code$($mp2.code)"
+
+# 10. ban user b -> existing token rejected + login blocked -> restore
+PostJson "$adm/users/$uidB/ban" @{action = 3; days = 0} $ha | Out-Null
+$bannedMe = Invoke-RestMethod "$api/user/me" -Headers $h2
+$bannedLogin = PostJson "$api/auth/login" @{email = "b@test.com"; password = "pass1234"} $null
+PostJson "$adm/users/$uidB/ban" @{action = 0} $ha | Out-Null
+$restoredLogin = PostJson "$api/auth/login" @{email = "b@test.com"; password = "pass1234"} $null
+Write-Output "[10] banned me=code$($bannedMe.code) login=code$($bannedLogin.code) restoredLogin=code$($restoredLogin.code)"
+
+# 11. banner CRUD -> home config reflects online banner
+$nb = PostJson "$adm/banners" @{title = "welcome"; image = "https://cdn.example.com/b1.png"; linkType = 0; sort = 1; status = 1} $ha
+$blist = (Invoke-RestMethod "$adm/banners" -Headers $ha).data
+$homeCfg = (Invoke-RestMethod "$api/home/config").data
+Invoke-RestMethod -Method Delete -Uri "$adm/banners/$($nb.data.id)" -Headers $ha | Out-Null
+$homeCfg2 = (Invoke-RestMethod "$api/home/config").data
+Write-Output "[11] banner id=$($nb.data.id) adminList=$(@($blist).Count) homeBanners=$(@($homeCfg.banners).Count) afterDelete=$(@($homeCfg2.banners).Count)"
+
+# 11.5 content search + one-click takedown/restore with counter rollback
+$cs = (Invoke-RestMethod "$adm/contents?type=1&keyword=circle3" -Headers $ha).data
+$cid5 = $cs.list[0].id
+$countBefore = (Invoke-RestMethod "$api/circles/3" -Headers $h1).data.postCount
+$ctd = PostJson "$adm/contents/takedown" @{type = 1; id = $cid5; action = 1; reason = "smoke takedown"} $ha
+$gone = (Invoke-RestMethod "$api/posts/$cid5" -Headers $h1).code
+$countMid = (Invoke-RestMethod "$api/circles/3" -Headers $h1).data.postCount
+$crs = PostJson "$adm/contents/takedown" @{type = 1; id = $cid5; action = 0} $ha
+$back = (Invoke-RestMethod "$api/posts/$cid5" -Headers $h1).code
+$countAfter = (Invoke-RestMethod "$api/circles/3" -Headers $h1).data.postCount
+Write-Output "[11.5] contentSearch=$($cs.total) takedown=code$($ctd.code) guest=code$gone (expect 40400) circleCount $countBefore->$countMid->$countAfter restore=code$($crs.code) visible=code$back"
+
+# 11.8 report workflow: pending list with target brief -> handle/reject with CAS + reporter notified
+$rp = (Invoke-RestMethod "$adm/reports" -Headers $ha).data
+$rid = $rp.list[0].id
+$hr = if ($rp.list[0].reporterId -eq $uidB) { $h2 } else { $h1 }
+$beforeRN = (Invoke-RestMethod "$api/notifications/unread" -Headers $hr).data.system
+$rh = PostJson "$adm/reports/$rid/handle" @{action = 1} $ha
+$rDup = PostJson "$adm/reports/$rid/handle" @{action = 1} $ha
+$afterRN = (Invoke-RestMethod "$api/notifications/unread" -Headers $hr).data.system
+$rLeft = (Invoke-RestMethod "$adm/reports" -Headers $ha).data.total
+Write-Output "[11.8] reports pending=$($rp.total) brief='$($rp.list[0].targetBrief)' handle=code$($rh.code) dup=code$($rDup.code) (expect 42900) reporterNotify $beforeRN->$afterRN (expect +1) left=$rLeft"
+
+# 11.9 sensitive word hot-reload: add block word -> post blocked; switch to mask -> masked; delete -> clean
+$nw = PostJson "$adm/words" @{word = "HOTRELOADWORD"; category = 5; level = 1} $ha
+$hb = PostJson "$api/posts" @{circleId = 2; content = "say HOTRELOADWORD now"} $h1
+PostJson "$adm/words" @{id = $nw.data.id; category = 5; level = 3; status = 1} $ha | Out-Null
+$hm = PostJson "$api/posts" @{circleId = 2; content = "say HOTRELOADWORD again"} $h1
+$hmDetail = (Invoke-RestMethod "$api/posts/$($hm.data.postId)" -Headers $h1).data
+Invoke-RestMethod -Method Delete -Uri "$adm/words/$($nw.data.id)" -Headers $ha | Out-Null
+$hc = PostJson "$api/posts" @{circleId = 2; content = "say HOTRELOADWORD clean"} $h1
+$hcDetail = (Invoke-RestMethod "$api/posts/$($hc.data.postId)" -Headers $h1).data
+$masked = $hmDetail.content.Contains('*') -and -not $hmDetail.content.Contains('HOTRELOADWORD')
+$clean = $hcDetail.content.Contains('HOTRELOADWORD')
+Write-Output "[11.9] word add=code$($nw.code) blocked=code$($hb.code) (expect 42200) masked=$masked (expect True) afterDelete clean=$clean (expect True)"
+
+# 11.95 faq crud: new rule answers instantly via bot conversation
+$nf = PostJson "$adm/faqs" @{keywords = "SMOKEFAQKEY"; reply = "SMOKE FAQ REPLY"; priority = 1} $ha
+PostJson "$api/im/messages" @{targetUid = 999999; msgType = 1; content = "ask SMOKEFAQKEY here"} $h1 | Out-Null
+Start-Sleep -Milliseconds 400
+$bconvs = (Invoke-RestMethod "$api/im/conversations" -Headers $h1).data
+$bconv = @($bconvs | Where-Object { $_.isBot })[0]
+$bhist = (Invoke-RestMethod "$api/im/messages?convId=$($bconv.convId)&size=3" -Headers $h1).data
+$blast = ($bhist | Sort-Object seq | Select-Object -Last 1)
+Invoke-RestMethod -Method Delete -Uri "$adm/faqs/$($nf.data.id)" -Headers $ha | Out-Null
+Write-Output "[11.95] faq create=code$($nf.code) botReply=[$($blast.content)] (expect SMOKE FAQ REPLY)"
+
+# 11.97 mall/task ops config: create deco -> visible in shop -> offline -> gone; prize + task validation
+$ndc = PostJson "$adm/mall/decorations" @{kind = 1; name = "SmokeFrame"; preview = "https://cdn.example.com/f/smoke.png"; price = 5; durationDays = 7} $ha
+$shopSeen = @(((Invoke-RestMethod "$api/mall/decorations?kind=1" -Headers $h1).data) | Where-Object { $_.name -eq 'SmokeFrame' }).Count
+PostJson "$adm/mall/decorations" @{id = $ndc.data.id; kind = 1; name = "SmokeFrame"; preview = "https://cdn.example.com/f/smoke.png"; price = 5; durationDays = 7; status = 0} $ha | Out-Null
+$shopGone = @(((Invoke-RestMethod "$api/mall/decorations?kind=1" -Headers $h1).data) | Where-Object { $_.name -eq 'SmokeFrame' }).Count
+$npz = PostJson "$adm/mall/prizes" @{name = "SmokePrize"; kind = 1; amount = 3; weight = 5; stock = 2} $ha
+$badPz = PostJson "$adm/mall/prizes" @{name = "BadRef"; kind = 2; refId = 99999; weight = 5} $ha
+$poolSeen = @(((Invoke-RestMethod "$api/lottery/pools" -Headers $h1).data.prizes) | Where-Object { $_.name -eq 'SmokePrize' }).Count
+$ntk = PostJson "$adm/mall/tasks" @{name = "SmokeTask"; type = 1; action = "like"; targetCount = 2; rewardYouzhu = 2} $ha
+$taskSeen = @(((Invoke-RestMethod "$api/tasks" -Headers $h1).data.tasks) | Where-Object { $_.name -eq 'SmokeTask' }).Count
+$badTk = PostJson "$adm/mall/tasks" @{name = "NoReward"; type = 1; action = "like"; targetCount = 1} $ha
+Write-Output "[11.97] deco add=code$($ndc.code) shop=$shopSeen->$shopGone (expect 1->0); prize=code$($npz.code) badRef=code$($badPz.code) (expect 40000) pool=$poolSeen (expect 1); task=code$($ntk.code) visible=$taskSeen (expect 1) noReward=code$($badTk.code) (expect 40000)"
+
+# 11.98 dashboard trend + software category management
+$tr = (Invoke-RestMethod "$adm/dashboard/trend?days=30" -Headers $ha).data
+$ncat = PostJson "$adm/software/categories" @{type = 1; name = "SmokeCat"; sort = 9} $ha
+$catSeen = @(((Invoke-RestMethod "$api/software/categories?type=1").data) | Where-Object { $_.name -eq 'SmokeCat' }).Count
+$dupCat = PostJson "$adm/software/categories" @{type = 1; name = "SmokeCat"} $ha
+PostJson "$adm/software/categories" @{id = $ncat.data.id; type = 1; name = "SmokeCat"; sort = 9; status = 0} $ha | Out-Null
+$catGone = @(((Invoke-RestMethod "$api/software/categories?type=1").data) | Where-Object { $_.name -eq 'SmokeCat' }).Count
+Write-Output "[11.98] trend days=$(@($tr.dates).Count) todayUsers=$($tr.users[-1]) (expect 5) todayPosts=$($tr.posts[-1]) (>0); category add=code$($ncat.code) seen=$catSeen->$catGone (expect 1->0) dup=code$($dupCat.code) (expect 42900)"
+
+# 12. dashboard + op logs recorded
+$dash = (Invoke-RestMethod "$adm/dashboard" -Headers $ha).data
+$logs = (Invoke-RestMethod "$adm/oplogs" -Headers $ha).data
+Write-Output "[12] dashboard users=$($dash.users) posts=$($dash.posts) pendingAudits=$($dash.pendingAudits) youzhu=$($dash.youzhuIssued)/$($dash.youzhuBurned); oplogs=$(@($logs).Count)"
+
+Write-Output "ADMIN_SMOKE_DONE"
+

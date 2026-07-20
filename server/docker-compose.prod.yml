@@ -1,0 +1,109 @@
+# Yiora 生产编排:GHCR 镜像 + 密钥环境变量注入 + Caddy 反代自动 TLS
+# 用法:
+#   1. cp .env.prod.example .env && 填写全部变量(密钥用密管/CI Secret 注入更佳)
+#   2. docker compose -f docker-compose.prod.yml up -d
+#   3. DNS 将 API_DOMAIN/WS_DOMAIN 指到本机,Caddy 自动签发 Let's Encrypt 证书
+# 安全基线:
+#   * mysql/redis/api/ws 仅走内部网络,不暴露宿主机端口;对外只有 Caddy 80/443
+#   * 首次启动自动执行 sql/ 迁移建表;后续增量迁移手动执行(见 README)
+name: yiora-prod
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${YIORA_MYSQL_ROOT_PASSWORD:?required}
+      MYSQL_DATABASE: yiora
+      MYSQL_USER: ${YIORA_MYSQL_USER:?required}
+      MYSQL_PASSWORD: ${YIORA_MYSQL_PASSWORD:?required}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci --default-time-zone=+08:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/001_m2_schema.sql:/docker-entrypoint-initdb.d/001_m2_schema.sql:ro
+      - ./sql/002_m3_software.sql:/docker-entrypoint-initdb.d/002_m3_software.sql:ro
+      - ./sql/003_m3_youzhu.sql:/docker-entrypoint-initdb.d/003_m3_youzhu.sql:ro
+      - ./sql/004_m4_mall.sql:/docker-entrypoint-initdb.d/004_m4_mall.sql:ro
+      - ./sql/005_m4_paid_ai.sql:/docker-entrypoint-initdb.d/005_m4_paid_ai.sql:ro
+      - ./sql/006_p1_comment_draft.sql:/docker-entrypoint-initdb.d/006_p1_comment_draft.sql:ro
+      - ./sql/007_p2_level_cert.sql:/docker-entrypoint-initdb.d/007_p2_level_cert.sql:ro
+      - ./sql/008_admin_seed.sql:/docker-entrypoint-initdb.d/008_admin_seed.sql:ro
+      - ./sql/009_admin_security.sql:/docker-entrypoint-initdb.d/009_admin_security.sql:ro
+      - ./sql/010_ops_mall_perm.sql:/docker-entrypoint-initdb.d/010_ops_mall_perm.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${YIORA_REDIS_PASSWORD:?required}", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${YIORA_REDIS_PASSWORD:?required}
+    networks: [internal]
+
+  api:
+    image: ${YIORA_IMAGE:-ghcr.io/OWNER/yiora-server:latest}
+    restart: unless-stopped
+    command: ["/app/yiora-api", "-f", "etc/prod/yiora-api.yaml"]
+    environment:
+      YIORA_JWT_SECRET: ${YIORA_JWT_SECRET:?required}
+      YIORA_INTERNAL_TOKEN: ${YIORA_INTERNAL_TOKEN:?required}
+      YIORA_MYSQL_USER: ${YIORA_MYSQL_USER:?required}
+      YIORA_MYSQL_PASSWORD: ${YIORA_MYSQL_PASSWORD:?required}
+      YIORA_REDIS_PASSWORD: ${YIORA_REDIS_PASSWORD:?required}
+      YIORA_SMTP_HOST: ${YIORA_SMTP_HOST:?required}
+      YIORA_SMTP_USER: ${YIORA_SMTP_USER:?required}
+      YIORA_SMTP_PASSWORD: ${YIORA_SMTP_PASSWORD:?required}
+      YIORA_SMTP_FROM: ${YIORA_SMTP_FROM:?required}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [internal]
+
+  ws:
+    image: ${YIORA_IMAGE:-ghcr.io/OWNER/yiora-server:latest}
+    restart: unless-stopped
+    command: ["/app/yiora-ws", "-f", "etc/prod/yiora-ws.yaml"]
+    environment:
+      YIORA_JWT_SECRET: ${YIORA_JWT_SECRET:?required}
+      YIORA_INTERNAL_TOKEN: ${YIORA_INTERNAL_TOKEN:?required}
+    networks: [internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${YIORA_API_DOMAIN:?required}
+      WS_DOMAIN: ${YIORA_WS_DOMAIN:?required}
+      ACME_EMAIL: ${YIORA_ACME_EMAIL:?required}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api, ws]
+    networks: [internal]
+
+volumes:
+  mysql-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:

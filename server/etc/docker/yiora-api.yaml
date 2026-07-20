@@ -1,0 +1,33 @@
+# docker-compose network config: use service names (mysql/redis/ws)
+Name: yiora-api
+Host: 0.0.0.0
+Port: 8888
+Timeout: 8000 # ms
+
+Auth:
+  AccessSecret: compose-dev-secret-do-not-use-in-prod # keep in sync with yiora-ws.yaml; prod uses secret manager
+  AccessExpire: 604800 # 7 days (seconds)
+
+MySQL:
+  DataSource: yiora:yiora123@tcp(mysql:3306)/yiora?charset=utf8mb4&parseTime=true&loc=Local
+
+Redis:
+  Host: redis:6379
+  Type: node
+
+WsPush:
+  URL: http://ws:8889/internal/push
+  Token: compose-dev-internal-token
+
+Email:
+  Host: smtp.example.com
+  Port: 465
+  Username: noreply@example.com
+  Password: change-me
+  From: noreply@example.com
+  Mock: true # dev: log the code instead of sending real mail
+
+Admin:
+  IPAllowlist: "" # comma-separated IP/CIDR allowlist for /admin/v1; empty = no restriction
+  LoginFailLimit: 5
+  LoginLockSec: 900

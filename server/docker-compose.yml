@@ -1,0 +1,67 @@
+# 一键联调环境:MySQL 8 + Redis 7 + 业务 API + WS 网关
+# 用法: docker compose up -d --build
+#   API  http://localhost:8888   WS  ws://localhost:8889/ws?token=...
+name: yiora
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: yiora
+      MYSQL_USER: yiora
+      MYSQL_PASSWORD: yiora123
+    # default-time-zone 与 api 容器 TZ(Asia/Shanghai)对齐,DATETIME 解析(DSN loc=Local)才不会偏移 8 小时
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci --default-time-zone=+08:00
+    ports:
+      - "13306:3306" # 宿主机 3306 常被本机 MySQL 占用,调试用 13306 连容器
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次初始化自动按文件名顺序建表(仅空数据卷时执行;已有卷需手动执行增量迁移)
+      - ./sql/001_m2_schema.sql:/docker-entrypoint-initdb.d/001_m2_schema.sql:ro
+      - ./sql/002_m3_software.sql:/docker-entrypoint-initdb.d/002_m3_software.sql:ro
+      - ./sql/003_m3_youzhu.sql:/docker-entrypoint-initdb.d/003_m3_youzhu.sql:ro
+      - ./sql/004_m4_mall.sql:/docker-entrypoint-initdb.d/004_m4_mall.sql:ro
+      - ./sql/005_m4_paid_ai.sql:/docker-entrypoint-initdb.d/005_m4_paid_ai.sql:ro
+      - ./sql/006_p1_comment_draft.sql:/docker-entrypoint-initdb.d/006_p1_comment_draft.sql:ro
+      - ./sql/007_p2_level_cert.sql:/docker-entrypoint-initdb.d/007_p2_level_cert.sql:ro
+      - ./sql/008_admin_seed.sql:/docker-entrypoint-initdb.d/008_admin_seed.sql:ro
+      - ./sql/009_admin_security.sql:/docker-entrypoint-initdb.d/009_admin_security.sql:ro
+      - ./sql/010_ops_mall_perm.sql:/docker-entrypoint-initdb.d/010_ops_mall_perm.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot123"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    command: ["/app/yiora-api", "-f", "etc/docker/yiora-api.yaml"]
+    ports:
+      - "8888:8888"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ws:
+    build: .
+    command: ["/app/yiora-ws", "-f", "etc/docker/yiora-ws.yaml"]
+    ports:
+      - "8889:8889"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:

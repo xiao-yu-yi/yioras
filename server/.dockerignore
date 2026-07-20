@@ -1,0 +1,9 @@
+.git
+*.md
+docker-compose*.yml
+Dockerfile
+.env*
+!.env.prod.example
+scripts/
+deploy/
+sql/
