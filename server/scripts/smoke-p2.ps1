@@ -8,9 +8,11 @@ function PostJson($uri, $obj, $headers) {
     return Invoke-RestMethod -Method Post -Uri $uri -ContentType 'application/json; charset=utf-8' -Body $bytes
 }
 # Windows 下 docker exec 参数内嵌引号会被重编码破坏,SQL 一律走临时文件拷贝执行
+# 临时目录用 GetTempPath():Windows=%TEMP%,Linux CI=/tmp(env:TEMP 在 Linux 为空)
 function MySqlN($sql) {
-    Set-Content -Path "$env:TEMP\yiora_p2.sql" -Value $sql -Encoding ASCII
-    docker cp "$env:TEMP\yiora_p2.sql" yiora-mysql-1:/tmp/p2.sql | Out-Null
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) "yiora_p2.sql"
+    Set-Content -Path $tmp -Value $sql -Encoding ASCII
+    docker cp $tmp yiora-mysql-1:/tmp/p2.sql | Out-Null
     return (docker compose exec -T mysql sh -c "mysql -uroot -proot123 -N yiora < /tmp/p2.sql 2>/dev/null" | Out-String).Trim()
 }
 

@@ -16,9 +16,6 @@ abstract interface class PublishRepository {
 
   /// 发布软件：内部完成 Logo/介绍图上传 → 创建软件（进入人工审核）
   Future<void> publishSoftware(SoftwareDraft draft);
-
-  /// 软件分类（按发布类型：1 应用 / 2 游戏）
-  Future<List<String>> fetchSoftwareCategories(int type);
 }
 
 class PublishRepositoryHttp implements PublishRepository {
@@ -58,18 +55,15 @@ class PublishRepositoryHttp implements PublishRepository {
       intro: draft.intro.trim(),
       imageUrls: imageUrls,
       type: draft.type,
-      category: draft.category,
+      categoryId: draft.category!.id,
       version: draft.version.trim(),
       size: draft.size.trim(),
       channel: draft.channel,
       tags: draft.tags,
       downloadUrl: draft.downloadUrl.trim(),
+      extractCode: draft.extractCode.trim(),
     );
   });
-
-  @override
-  Future<List<String>> fetchSoftwareCategories(int type) =>
-      _guard(() => _api.fetchSoftwareCategories(type));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
@@ -113,14 +107,6 @@ class PublishRepositoryMock implements PublishRepository {
     await Future<void>.delayed(
       Duration(milliseconds: 900 + draft.imagePaths.length * 300),
     );
-  }
-
-  @override
-  Future<List<String>> fetchSoftwareCategories(int type) async {
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    return type == 1
-        ? const ['工具', '影音', '社交', '学习', '效率', '美化']
-        : const ['休闲', '角色扮演', '策略', '动作', '模拟经营'];
   }
 }
 

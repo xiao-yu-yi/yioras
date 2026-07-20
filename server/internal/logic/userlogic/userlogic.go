@@ -109,6 +109,38 @@ func (l *Logic) UpdateMe(ctx context.Context, uid int64, req *types.UpdateProfil
 	return nil
 }
 
+// Settings 用户设置(青少年模式等)。
+func (l *Logic) Settings(ctx context.Context, uid int64) (*types.UserSettingsResp, error) {
+	u, err := l.svcCtx.UserModel.FindByID(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("find user: %w", err)
+	}
+	return &types.UserSettingsResp{TeenMode: u.TeenMode == 1}, nil
+}
+
+// UpdateSettings 更新设置。
+func (l *Logic) UpdateSettings(ctx context.Context, uid int64, req *types.UpdateSettingsReq) error {
+	if req.TeenMode == nil {
+		return xerr.Param("没有需要更新的设置")
+	}
+	if err := l.svcCtx.UserModel.SetTeenMode(ctx, uid, *req.TeenMode); err != nil {
+		return err
+	}
+	return nil
+}
+
+// EnsureNotTeen 青少年模式下禁用消费类功能(付费解锁/抽奖/兑换),合规基线。
+func EnsureNotTeen(ctx context.Context, svcCtx *svc.ServiceContext, uid int64) error {
+	u, err := svcCtx.UserModel.FindByID(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("find user: %w", err)
+	}
+	if u.TeenMode == 1 {
+		return xerr.New(xerr.CodeForbidden, "青少年模式下无法使用该功能")
+	}
+	return nil
+}
+
 // DeactivateKey 注销吊销标记(JWT 无状态,注销后按 uid 拉黑到令牌自然过期)。
 func DeactivateKey(uid int64) string { return fmt.Sprintf("user:deactivated:%d", uid) }
 

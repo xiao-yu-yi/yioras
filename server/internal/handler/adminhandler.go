@@ -748,6 +748,21 @@ func adminSavePrettyNoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	})
 }
 
+func adminDeletePrettyNoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, id adminIdentity) {
+		var req types.IDPath
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := adminlogic.New(svcCtx).DeletePrettyNo(r.Context(), id.AdminID, req.ID, httpx.GetRemoteAddr(r)); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	})
+}
+
 func adminTaskCfgsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return adminAuth(svcCtx, "ops.mall", func(w http.ResponseWriter, r *http.Request, _ adminIdentity) {
 		out, err := adminlogic.New(svcCtx).TaskCfgs(r.Context())

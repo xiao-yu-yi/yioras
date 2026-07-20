@@ -30,6 +30,7 @@ services:
       - ./sql/010_ops_mall_perm.sql:/docker-entrypoint-initdb.d/010_ops_mall_perm.sql:ro
       - ./sql/011_admin_totp.sql:/docker-entrypoint-initdb.d/011_admin_totp.sql:ro
       - ./sql/012_agreement.sql:/docker-entrypoint-initdb.d/012_agreement.sql:ro
+      - ./sql/013_teen_share.sql:/docker-entrypoint-initdb.d/013_teen_share.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot123"]
       interval: 5s

@@ -1443,6 +1443,17 @@ func (m *AdminModel) GrantTitle(ctx context.Context, uid, kind int64, grant bool
 	return nil
 }
 
+// DeletePrettyNoAdmin 删除靓号 SKU(仅未售出;已售保留成交记录)。返回 false=不存在或已售。
+func (m *AdminModel) DeletePrettyNoAdmin(ctx context.Context, id int64) (bool, error) {
+	r, err := m.conn.ExecCtx(ctx,
+		"DELETE FROM `pretty_no_sku` WHERE id = ? AND status != 2", id)
+	if err != nil {
+		return false, fmt.Errorf("delete pretty no: %w", err)
+	}
+	n, _ := r.RowsAffected()
+	return n == 1, nil
+}
+
 // AppointCircleRole 圈主/管理员任命(后台动作):确保成员行并设角色。
 func (m *AdminModel) AppointCircleRole(ctx context.Context, circleID, uid, role int64) error {
 	return m.conn.TransactCtx(ctx, func(ctx context.Context, s sqlx.Session) error {

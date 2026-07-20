@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/yiora/server/internal/logic/userlogic"
 	"github.com/yiora/server/internal/model"
 	"github.com/yiora/server/internal/pkg/xerr"
 	"github.com/yiora/server/internal/svc"
@@ -54,6 +55,9 @@ func (l *Logic) Decorations(ctx context.Context, uid int64, req *types.Decoratio
 
 // Exchange 兑换装扮。
 func (l *Logic) Exchange(ctx context.Context, uid, decorationID int64) error {
+	if err := userlogic.EnsureNotTeen(ctx, l.svcCtx, uid); err != nil {
+		return err
+	}
 	d, err := l.svcCtx.MallModel.FindDecoration(ctx, decorationID)
 	if err != nil {
 		if model.IsNotFound(err) {
@@ -132,6 +136,9 @@ func (l *Logic) PrettyNos(ctx context.Context, req *types.PageReq) ([]types.Pret
 
 // ExchangeNo 兑换靓号并替换展示编号。
 func (l *Logic) ExchangeNo(ctx context.Context, uid, skuID int64) (*types.ExchangeNoResp, error) {
+	if err := userlogic.EnsureNotTeen(ctx, l.svcCtx, uid); err != nil {
+		return nil, err
+	}
 	no, err := l.svcCtx.MallModel.ExchangePrettyNo(ctx, uid, skuID)
 	if err != nil {
 		switch {
@@ -170,6 +177,9 @@ func (l *Logic) Pools(ctx context.Context) (*types.LotteryPoolsResp, error) {
 
 // Draw 抽一次奖。
 func (l *Logic) Draw(ctx context.Context, uid int64) (*types.DrawResp, error) {
+	if err := userlogic.EnsureNotTeen(ctx, l.svcCtx, uid); err != nil {
+		return nil, err
+	}
 	prize, err := l.svcCtx.MallModel.Draw(ctx, uid, drawCost)
 	if err != nil {
 		switch {

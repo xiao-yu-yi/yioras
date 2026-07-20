@@ -101,7 +101,7 @@ Write-Output "[1.95] confirm=code$($cfm.code) relogin ticket=$([bool]$l2.data.to
 # helper: upload a small real image and return its fileUrl (whitelist-compliant)
 function New-UploadedImage($presignUri, $headers, $kind) {
     $p = PostJson $presignUri @{kind = $kind; fileName = "i.png"; size = 128} $headers
-    $t = Join-Path $env:TEMP ("smoke_a_" + [Guid]::NewGuid().ToString("N") + ".png")
+    $t = Join-Path ([IO.Path]::GetTempPath()) ("smoke_a_" + [Guid]::NewGuid().ToString("N") + ".png")
     [IO.File]::WriteAllBytes($t, (New-Object byte[] 128))
     Invoke-WebRequest -Method Put -Uri $p.data.uploadUrl -InFile $t -UseBasicParsing | Out-Null
     Remove-Item $t -ErrorAction SilentlyContinue
@@ -264,7 +264,7 @@ $catGone = @(((Invoke-RestMethod "$api/software/categories?type=1").data) | Wher
 Write-Output "[11.98] trend days=$(@($tr.dates).Count) todayUsers=$($tr.users[-1]) (expect 5) todayPosts=$($tr.posts[-1]) (>0); category add=code$($ncat.code) seen=$catSeen->$catGone (expect 1->0) dup=code$($dupCat.code) (expect 42900)"
 
 # 11.99 presigned upload: sign -> real PUT to MinIO -> fetch back and compare; invalid ext/size rejected
-$tmp = Join-Path $env:TEMP "yiora_upload_test.png"
+$tmp = Join-Path ([IO.Path]::GetTempPath()) "yiora_upload_test.png"
 $payload = New-Object byte[] 2048
 (New-Object Random).NextBytes($payload)
 [IO.File]::WriteAllBytes($tmp, $payload)
@@ -316,6 +316,19 @@ $lg4 = PostJson "$api/auth/login" @{email = "a@test.com"; password = "pass1234";
 Invoke-RestMethod -Method Delete -Uri "$api/user/devices/$($lg4.data.deviceId)" -Headers $hA3 | Out-Null
 $kicked3 = Invoke-RestMethod "$api/user/me" -Headers @{Authorization = "Bearer $($lg4.data.token)"}
 Write-Output "[12.3] refresh=code$($ref3.code) rotated=$($ref3.data.refreshToken -ne $reg3.data.refreshToken) replay=code$($replay3.code) (expect 40100) devices=$(@($devs3).Count) kickedAccess=code$($kicked3.code) (expect 40100)"
+
+# 12.35 P-level wrap: teen mode blocks spending, share code round trip, pretty-no delete
+Invoke-RestMethod -Method Put -Uri "$api/user/settings" -Headers $h2 -ContentType 'application/json' -Body '{"teenMode":true}' | Out-Null
+$teenSet = (Invoke-RestMethod "$api/user/settings" -Headers $h2).data
+$teenDraw = PostJson "$api/lottery/draw" @{} $h2
+Invoke-RestMethod -Method Put -Uri "$api/user/settings" -Headers $h2 -ContentType 'application/json' -Body '{"teenMode":false}' | Out-Null
+$share = PostJson "$api/posts/$($target.data.postId)/share" @{} $h1
+$share2 = PostJson "$api/posts/$($target.data.postId)/share" @{} $h1
+$resolved = (Invoke-RestMethod "$api/share/$($share.data.code)").data
+$badCode = Invoke-RestMethod "$api/share/YRNOTEXIST1"
+$delOk = Invoke-RestMethod -Method Delete -Uri "$adm/mall/prettynos/$($np2.data.id)" -Headers $ha
+$soldDel = Invoke-RestMethod -Method Delete -Uri "$adm/mall/prettynos/999" -Headers $ha
+Write-Output "[12.35] teenOn=$($teenSet.teenMode) draw=code$($teenDraw.code) (expect 40300); shareCode=$($share.data.code) reuse=$($share.data.code -eq $share2.data.code) resolvePost=$($resolved.postId) (expect $($target.data.postId)) badCode=code$($badCode.code) (expect 40400); prettyDel=code$($delOk.code) missingDel=code$($soldDel.code) (expect 40300)"
 
 # 12.4 batch4 compliance: agreement read/edit, user level/title adjust
 $agr = (Invoke-RestMethod "$api/agreements/privacy").data

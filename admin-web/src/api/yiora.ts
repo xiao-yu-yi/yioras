@@ -305,6 +305,7 @@ export const api = {
   prettyNos: (params: { keyword?: string; status: number; page: number; size: number }) =>
     http.get('/mall/prettynos', { params }) as Promise<{ total: number; list: AdminPrettyNoItem[] }>,
   savePrettyNo: (p: Partial<AdminPrettyNoItem>) => http.post('/mall/prettynos', p) as Promise<{ id: number }>,
+  deletePrettyNo: (id: number) => http.delete(`/mall/prettynos/${id}`),
   // 用户等级/头衔
   setUserLevel: (userId: number, patch: { level?: number; exp?: number }) =>
     http.post(`/users/${userId}/level`, patch),

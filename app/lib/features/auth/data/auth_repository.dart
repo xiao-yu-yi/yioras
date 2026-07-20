@@ -27,6 +27,13 @@ abstract interface class AuthRepository {
     required EmailCodeScene scene,
   });
 
+  /// 邮箱验证码重置密码（找回密码，不改变登录态）
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  });
+
   Future<void> logout();
 }
 
@@ -84,6 +91,15 @@ class AuthRepositoryHttp implements AuthRepository {
     required String email,
     required EmailCodeScene scene,
   }) => _guard(() => _api.sendEmailCode(email: email, scene: scene));
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) => _guard(
+    () => _api.resetPassword(email: email, code: code, newPassword: newPassword),
+  );
 
   @override
   Future<void> logout() => _storage.clear();
@@ -162,6 +178,19 @@ class AuthRepositoryMock implements AuthRepository {
     required String email,
     required EmailCodeScene scene,
   }) => Future<void>.delayed(const Duration(milliseconds: 500));
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    // Mock 规则：验证码 000000 模拟错误码分支，其余 6 位数字均通过
+    if (code == '000000') {
+      throw const ApiException(code: 40001, message: '验证码错误或已过期');
+    }
+  }
 
   @override
   Future<void> logout() => _storage.clear();

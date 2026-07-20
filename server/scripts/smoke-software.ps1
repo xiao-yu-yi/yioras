@@ -20,7 +20,7 @@ $catId = $cats[0].id
 
 # upload one real image via presign (logo/screenshots must come from our storage now)
 $preS = PostJson "$api/upload/presign" @{kind = "software"; fileName = "s.png"; size = 256} $h1
-$tmpS = Join-Path $env:TEMP "smoke_s_img.png"
+$tmpS = Join-Path ([IO.Path]::GetTempPath()) "smoke_s_img.png"
 [IO.File]::WriteAllBytes($tmpS, (New-Object byte[] 256))
 Invoke-WebRequest -Method Put -Uri $preS.data.uploadUrl -InFile $tmpS -UseBasicParsing | Out-Null
 Remove-Item $tmpS -ErrorAction SilentlyContinue

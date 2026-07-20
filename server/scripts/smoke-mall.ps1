@@ -22,8 +22,9 @@ INSERT INTO youzhu_log (user_id,biz_type,biz_key,amount,balance_after,remark)
 SELECT $uidB,3,'ops:seed:$uidB',500,balance+500,'ops grant' FROM youzhu_account WHERE user_id=$uidB;
 UPDATE youzhu_account SET balance=balance+500 WHERE user_id=$uidB;
 "@
-Set-Content -Path "$env:TEMP\yiora_grant.sql" -Value $grantSql -Encoding ASCII
-docker cp "$env:TEMP\yiora_grant.sql" yiora-mysql-1:/tmp/grant.sql | Out-Null
+$grantTmp = Join-Path ([IO.Path]::GetTempPath()) "yiora_grant.sql"
+Set-Content -Path $grantTmp -Value $grantSql -Encoding ASCII
+docker cp $grantTmp yiora-mysql-1:/tmp/grant.sql | Out-Null
 docker compose exec -T mysql sh -c "mysql -uroot -proot123 yiora < /tmp/grant.sql 2>/dev/null" | Out-Null
 $acct0 = (Invoke-RestMethod "$api/youzhu/account" -Headers $h2).data
 Write-Output "[0] ops grant done, balance=$($acct0.balance)"

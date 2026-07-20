@@ -9,6 +9,8 @@ import '../../../core/utils/time_format.dart';
 import '../../feed/controller/post_like_controller.dart';
 import '../../feed/model/post.dart';
 import '../../feed/widget/post_card.dart' show PostCard;
+import '../../report/data/report_repository.dart';
+import '../../report/widget/report_sheet.dart';
 import '../../user/controller/follow_controller.dart';
 import '../controller/post_detail_controller.dart';
 import '../model/post_detail.dart';
@@ -43,6 +45,23 @@ class PostDetailPage extends ConsumerWidget {
           '帖子详情',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+        actions: [
+          // 举报入口（文档 3.3 帖子互动）
+          if (detail.value != null)
+            IconButton(
+              tooltip: '举报',
+              icon: const Icon(Icons.more_horiz),
+              onPressed: () {
+                final post = detail.value!.detail.post;
+                showReportSheet(
+                  context,
+                  targetType: ReportTargetType.post,
+                  targetId: postId,
+                  targetBrief: post.title.isNotEmpty ? post.title : post.content,
+                );
+              },
+            ),
+        ],
       ),
       body: switch (detail) {
         AsyncData(:final value) => _DetailBody(postId: postId, state: value),
@@ -95,6 +114,16 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
           ..showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
+  }
+
+  /// 长按评论 → 举报该评论
+  void _reportComment(Comment comment) {
+    showReportSheet(
+      context,
+      targetType: ReportTargetType.comment,
+      targetId: comment.id,
+      targetBrief: comment.content,
+    );
   }
 
   @override
@@ -248,6 +277,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                           thread: state.replyThreads[comment.id],
                           onReply: _pickReply,
                           onLike: _toggleCommentLike,
+                          onReport: _reportComment,
                           onToggleReplies: () => ref
                               .read(
                                 postDetailControllerProvider(postId).notifier,
@@ -693,7 +723,7 @@ class _InteractionRow extends ConsumerWidget {
 }
 
 /// 两级评论：一级评论 + 缩进的回复区。
-/// 点评论内容切换回复对象；点爱心点赞（两级均支持）；
+/// 点评论内容切换回复对象；点爱心点赞（两级均支持）；长按举报；
 /// 「共 N 条回复」可展开全量分页拉取，展开后可继续加载或收起。
 class _CommentTile extends StatelessWidget {
   const _CommentTile({
@@ -702,6 +732,7 @@ class _CommentTile extends StatelessWidget {
     required this.thread,
     required this.onReply,
     required this.onLike,
+    required this.onReport,
     required this.onToggleReplies,
     required this.onLoadMoreReplies,
   });
@@ -710,6 +741,7 @@ class _CommentTile extends StatelessWidget {
   final ReplyThreadState? thread;
   final void Function(Comment target, {required Comment root}) onReply;
   final void Function(Comment target) onLike;
+  final void Function(Comment target) onReport;
   final VoidCallback onToggleReplies;
   final VoidCallback onLoadMoreReplies;
 
@@ -729,6 +761,7 @@ class _CommentTile extends StatelessWidget {
           comment: comment,
           onTap: () => onReply(comment, root: comment),
           onLike: () => onLike(comment),
+          onLongPress: () => onReport(comment),
         ),
         if (showBox)
           Padding(
@@ -749,6 +782,7 @@ class _CommentTile extends StatelessWidget {
                       dense: true,
                       onTap: () => onReply(visibleReplies[i], root: comment),
                       onLike: () => onLike(visibleReplies[i]),
+                      onLongPress: () => onReport(visibleReplies[i]),
                     ),
                   ],
                   _ReplyThreadFooter(
@@ -851,6 +885,7 @@ class _CommentRow extends StatelessWidget {
     this.dense = false,
     this.onTap,
     this.onLike,
+    this.onLongPress,
   });
 
   final Comment comment;
@@ -861,6 +896,9 @@ class _CommentRow extends StatelessWidget {
 
   /// 点爱心：点赞/取消
   final VoidCallback? onLike;
+
+  /// 长按内容区：举报评论
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -885,6 +923,7 @@ class _CommentRow extends StatelessWidget {
         Expanded(
           child: GestureDetector(
             onTap: onTap,
+            onLongPress: onLongPress,
             behavior: HitTestBehavior.opaque,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

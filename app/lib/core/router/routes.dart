@@ -2,6 +2,7 @@
 abstract final class Routes {
   static const splash = '/splash';
   static const login = '/login';
+  static const resetPassword = '/reset-password';
 
   // 主壳四个 Tab 分支（发布为弹层不占路由）
   static const home = '/home';

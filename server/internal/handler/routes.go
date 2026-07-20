@@ -21,6 +21,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/auth/refresh", Handler: refreshTokenHandler(svcCtx)},
 
 		{Method: http.MethodGet, Path: "/agreements/:kind", Handler: agreementHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/share/:code", Handler: resolveShareHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/home/config", Handler: homeConfigHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/posts", Handler: feedHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/posts/:id", Handler: postDetailHandler(svcCtx)},
@@ -52,6 +53,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPut, Path: "/user/me", Handler: updateMeHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/user/devices", Handler: deviceListHandler(svcCtx)},
 		{Method: http.MethodDelete, Path: "/user/devices/:id", Handler: kickDeviceHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/user/settings", Handler: userSettingsHandler(svcCtx)},
+		{Method: http.MethodPut, Path: "/user/settings", Handler: updateSettingsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/user/deactivate", Handler: deactivateHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/user/history", Handler: userHistoryHandler(svcCtx)},
 		{Method: http.MethodDelete, Path: "/user/history", Handler: clearHistoryHandler(svcCtx)},
@@ -67,6 +70,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodDelete, Path: "/drafts/:id", Handler: deleteDraftHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/posts/:id/like", Handler: likePostHandler(svcCtx)},
 		{Method: http.MethodDelete, Path: "/posts/:id/like", Handler: unlikePostHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/posts/:id/share", Handler: sharePostHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/posts/:id/favorite", Handler: favoritePostHandler(svcCtx)},
 		{Method: http.MethodDelete, Path: "/posts/:id/favorite", Handler: unfavoritePostHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/posts/:id/unlock", Handler: unlockPostHandler(svcCtx)},
@@ -184,6 +188,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/mall/tasks", Handler: adminSaveTaskCfgHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/mall/prettynos", Handler: adminPrettyNosHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/mall/prettynos", Handler: adminSavePrettyNoHandler(svcCtx)},
+		{Method: http.MethodDelete, Path: "/mall/prettynos/:id", Handler: adminDeletePrettyNoHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/youzhu/grant", Handler: adminGrantYouzhuHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/youzhu/logs", Handler: adminYouzhuLogsHandler(svcCtx)},
 	}, rest.WithPrefix("/admin/v1"))

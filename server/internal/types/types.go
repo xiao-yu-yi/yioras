@@ -37,6 +37,35 @@ type KickDeviceReq struct {
 	DeviceID string `path:"id"`
 }
 
+// ---- 用户设置(青少年模式等) ----
+
+type UserSettingsResp struct {
+	TeenMode bool `json:"teenMode"`
+}
+
+type UpdateSettingsReq struct {
+	TeenMode *bool `json:"teenMode,optional"` // 缺省不变
+}
+
+// ---- 帖子分享口令 ----
+
+type SharePostResp struct {
+	Code string `json:"code"` // 口令,如 YR1A2B3C4D
+	Text string `json:"text"` // 可直接复制的分享文案
+}
+
+type ShareResolveReq struct {
+	Code string `path:"code"`
+}
+
+type ShareResolveResp struct {
+	PostID   int64  `json:"postId"`
+	Title    string `json:"title"`
+	Summary  string `json:"summary"`
+	Author   string `json:"author"`
+	AuthorID int64  `json:"authorId"`
+}
+
 type ResetPasswordReq struct {
 	Email    string `json:"email"`
 	Code     string `json:"code"` // scene=reset 的邮箱验证码

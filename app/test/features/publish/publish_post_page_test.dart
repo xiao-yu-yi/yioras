@@ -47,6 +47,7 @@ class _FakeCircleRepository implements CircleRepository {
   @override
   Future<PostPage> fetchCirclePosts(
     int circleId, {
+    CirclePostSort sort = CirclePostSort.newest,
     String? cursor,
     int size = 20,
   }) async => const PostPage(list: [], nextCursor: null, hasMore: false);

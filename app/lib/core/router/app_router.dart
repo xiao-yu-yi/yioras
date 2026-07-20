@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/controller/auth_controller.dart';
 import '../../features/auth/view/login_page.dart';
+import '../../features/auth/view/reset_password_page.dart';
 import '../../features/chat/view/chat_page.dart';
 import '../../features/circle/view/circle_detail_page.dart';
 import '../../features/circle/view/circle_discover_page.dart';
@@ -42,12 +43,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final auth = ref.read(authControllerProvider);
       final location = state.matchedLocation;
       final atSplash = location == Routes.splash;
-      final atLogin = location == Routes.login;
+      // 未登录可停留的开放页：登录页与找回密码页
+      final atAuthFlow =
+          location == Routes.login || location == Routes.resetPassword;
 
       return switch (auth) {
         AuthUnknown() => atSplash ? null : Routes.splash,
-        AuthUnauthenticated() => atLogin ? null : Routes.login,
-        AuthAuthenticated() => (atSplash || atLogin) ? Routes.home : null,
+        AuthUnauthenticated() => atAuthFlow ? null : Routes.login,
+        AuthAuthenticated() => (atSplash || atAuthFlow) ? Routes.home : null,
       };
     },
     routes: [
@@ -58,6 +61,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.login,
         builder: (context, state) => const LoginPage(),
+      ),
+      GoRoute(
+        path: Routes.resetPassword,
+        builder: (context, state) => const ResetPasswordPage(),
       ),
       // 全屏页（脱离底部 Tab 壳）
       GoRoute(

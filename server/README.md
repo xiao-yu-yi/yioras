@@ -233,13 +233,15 @@ curl -X DELETE localhost:8888/api/v1/user/devices/<did> -H "Authorization: Beare
 ## 回归冒烟基线(发版前必跑)
 
 ```powershell
-# 重置数据卷 → 起 mysql/redis/api/ws → 依次跑 community/software/m3/mall/paid-ai/content/account/p1/p2/admin 十个套件
-powershell -ExecutionPolicy Bypass -File scripts\smoke.ps1
+# 重置数据卷 → 起 mysql/redis/minio/api/ws → 依次跑 community/software/m3/mall/paid-ai/content/account/p1/p2/admin 十个套件
+powershell -ExecutionPolicy Bypass -File scripts/smoke.ps1
 # 期望输出:SMOKE RESULT: ALL PASSED
 ```
 
 单个套件可独立执行(有依赖顺序:community 注册账号,后续套件复用账号与忧珠),
 需要真实 WS 收包验证时看 community 套件的 im.msg/im.recall 帧输出。
+脚本兼容 Windows PowerShell 5.1 与 pwsh 7;CI(GitHub Actions `smoke` job)在 ubuntu runner
+上用 pwsh 跑同一份基线,PR 与主干推进自动执行,与本地结果一致。
 
 ## 忧珠账务集成测试(真 MySQL 并发安全)
 

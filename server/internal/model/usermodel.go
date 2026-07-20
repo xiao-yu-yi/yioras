@@ -26,6 +26,7 @@ type (
 		Level     int64          `db:"level"`
 		Exp       int64          `db:"exp"`
 		Status    int64          `db:"status"`
+		TeenMode  int64          `db:"teen_mode"`
 		CreatedAt time.Time      `db:"created_at"`
 		UpdatedAt time.Time      `db:"updated_at"`
 	}
@@ -87,7 +88,7 @@ func (m *UserModel) FindAuthByEmail(ctx context.Context, email string) (*UserAut
 func (m *UserModel) FindByID(ctx context.Context, id int64) (*User, error) {
 	var u User
 	err := m.conn.QueryRowCtx(ctx, &u,
-		"SELECT id, display_no, nickname, avatar, cover, signature, gender, birthday, level, exp, status, created_at, updated_at FROM `user` WHERE id = ? LIMIT 1", id)
+		"SELECT id, display_no, nickname, avatar, cover, signature, gender, birthday, level, exp, status, teen_mode, created_at, updated_at FROM `user` WHERE id = ? LIMIT 1", id)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +116,19 @@ func (m *UserModel) UpdatePassword(ctx context.Context, uid int64, passwordHash 
 }
 
 // Deactivate 注销账号(status=4);邮箱保留不释放(防止身份复用纠纷)。
+// SetTeenMode 青少年模式开关。
+func (m *UserModel) SetTeenMode(ctx context.Context, uid int64, on bool) error {
+	v := 0
+	if on {
+		v = 1
+	}
+	if _, err := m.conn.ExecCtx(ctx,
+		"UPDATE `user` SET teen_mode = ? WHERE id = ?", v, uid); err != nil {
+		return fmt.Errorf("set teen mode: %w", err)
+	}
+	return nil
+}
+
 func (m *UserModel) Deactivate(ctx context.Context, uid int64) (bool, error) {
 	r, err := m.conn.ExecCtx(ctx,
 		"UPDATE `user` SET status = 4 WHERE id = ? AND status != 4", uid)

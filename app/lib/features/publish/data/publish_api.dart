@@ -55,12 +55,13 @@ class PublishApi {
     required String intro,
     required List<String> imageUrls,
     required int type,
-    required String category,
+    required int categoryId,
     required String version,
     required String size,
     required String channel,
     required List<String> tags,
     required String downloadUrl,
+    String extractCode = '',
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
       '${AppConfig.apiPrefix}/software',
@@ -70,29 +71,16 @@ class PublishApi {
         'intro': intro,
         'images': imageUrls,
         'type': type,
-        'category': category,
+        'categoryId': categoryId,
         'version': version,
         'size': size,
         'channel': channel,
         'tags': tags,
         'downloadUrl': downloadUrl,
+        if (extractCode.isNotEmpty) 'extractCode': extractCode,
       },
     );
     ApiResponse.fromJson(resp.data!, (_) => null).unwrap();
-  }
-
-  /// GET /software/categories?type= 软件分类（发布器分类 chips 数据源）
-  Future<List<String>> fetchSoftwareCategories(int type) async {
-    final resp = await _dio.get<Map<String, dynamic>>(
-      '${AppConfig.apiPrefix}/software/categories',
-      queryParameters: {'type': type},
-    );
-    return ApiResponse.fromJson(
-      resp.data!,
-      (data) => ((data as Map<String, dynamic>)['list'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList(),
-    ).unwrap();
   }
 
   /// GET /topics/hot 热门话题（话题选择器数据源）

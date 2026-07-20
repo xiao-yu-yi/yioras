@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/router/routes.dart';
 import '../controller/auth_controller.dart';
 import '../data/auth_api.dart';
 
@@ -338,9 +340,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       TextButton(
                         onPressed: _submitting
                             ? null
-                            : () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('找回密码将在后续版本开放')),
-                              ),
+                            : () => context.push(Routes.resetPassword),
                         child: const Text('忘记密码？'),
                       ),
                     const SizedBox(height: 8),

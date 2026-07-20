@@ -7,6 +7,8 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/routes.dart';
 import '../../../core/utils/time_format.dart';
 import '../../feed/widget/post_card.dart';
+import '../../report/data/report_repository.dart';
+import '../../report/widget/report_sheet.dart';
 import '../controller/follow_controller.dart';
 import '../data/user_repository.dart';
 import '../model/user_profile.dart';
@@ -76,6 +78,19 @@ class _ProfileBody extends ConsumerWidget {
               profile.nickname,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
+            actions: [
+              // 举报入口（文档 3.8 他人主页）
+              IconButton(
+                tooltip: '举报',
+                icon: const Icon(Icons.more_horiz),
+                onPressed: () => showReportSheet(
+                  context,
+                  targetType: ReportTargetType.user,
+                  targetId: profile.id,
+                  targetBrief: profile.nickname,
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,

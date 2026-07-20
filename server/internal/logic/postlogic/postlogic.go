@@ -3,8 +3,11 @@ package postlogic
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -163,6 +166,78 @@ func (l *Logic) Create(ctx context.Context, uid int64, req *types.CreatePostReq)
 		}
 	}
 	return &types.CreatePostResp{PostID: postID, Status: status, Tip: tip}, nil
+}
+
+const shareTTLSec = 30 * 86400
+
+// Share 生成帖子分享口令:同帖 30 天内复用同一口令,首次生成计入 share_count。
+func (l *Logic) Share(ctx context.Context, uid, postID int64) (*types.SharePostResp, error) {
+	p, err := l.findPublished(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	reuseKey := fmt.Sprintf("share:post:%d", postID)
+	code, _ := l.svcCtx.Redis.GetCtx(ctx, reuseKey)
+	if code == "" {
+		code = "YR" + randShareCode(8)
+		if err := l.svcCtx.Redis.SetexCtx(ctx, "share:code:"+code, fmt.Sprint(postID), shareTTLSec); err != nil {
+			return nil, fmt.Errorf("store share code: %w", err)
+		}
+		_ = l.svcCtx.Redis.SetexCtx(ctx, reuseKey, code, shareTTLSec)
+		if err := l.svcCtx.PostModel.IncrShareCount(ctx, postID); err != nil {
+			logx.WithContext(ctx).Errorf("share count: %v", err)
+		}
+	}
+	name := p.Title
+	if name == "" {
+		name = truncateShare(p.Content, 20)
+	}
+	return &types.SharePostResp{
+		Code: code,
+		Text: fmt.Sprintf("【%s】复制这段话打开 Yiora,输入口令即可查看:%s", name, code),
+	}, nil
+}
+
+// ResolveShare 口令解析(免登录):返回帖子摘要供跳转确认。
+func (l *Logic) ResolveShare(ctx context.Context, code string) (*types.ShareResolveResp, error) {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	raw, err := l.svcCtx.Redis.GetCtx(ctx, "share:code:"+code)
+	if err != nil || raw == "" {
+		return nil, xerr.New(xerr.CodeNotFound, "口令无效或已过期")
+	}
+	postID, _ := strconv.ParseInt(raw, 10, 64)
+	p, err := l.findPublished(ctx, postID)
+	if err != nil {
+		return nil, xerr.New(xerr.CodeNotFound, "帖子已下架或删除")
+	}
+	author, _ := l.svcCtx.UserModel.FindByID(ctx, p.UserID)
+	authorName := ""
+	if author != nil {
+		authorName = author.Nickname
+	}
+	return &types.ShareResolveResp{
+		PostID: p.ID, Title: p.Title, Summary: truncateShare(p.Content, 60),
+		Author: authorName, AuthorID: p.UserID,
+	}, nil
+}
+
+// randShareCode 口令随机段(去易混淆字符)。
+func randShareCode(n int) string {
+	const set = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(set))))
+		b.WriteByte(set[idx.Int64()])
+	}
+	return b.String()
+}
+
+func truncateShare(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "..."
 }
 
 // checkImages 帖图必须来自我方对象存储(直传 fileUrl),防外链注入。
@@ -526,6 +601,10 @@ func (l *Logic) Detail(ctx context.Context, uid, postID int64) (*types.PostItem,
 
 // Unlock 忧珠解锁付费帖:买家扣款+作者分成(平台抽成)双账户单事务,成功即下发全文。
 func (l *Logic) Unlock(ctx context.Context, uid, postID int64) (*types.UnlockResp, error) {
+	// 青少年模式禁用消费(userlogic 依赖本包,这里内联检查避免 import 环)
+	if u, err := l.svcCtx.UserModel.FindByID(ctx, uid); err == nil && u.TeenMode == 1 {
+		return nil, xerr.New(xerr.CodeForbidden, "青少年模式下无法使用该功能")
+	}
 	p, err := l.findPublished(ctx, postID)
 	if err != nil {
 		return nil, err

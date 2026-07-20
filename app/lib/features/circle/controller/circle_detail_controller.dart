@@ -6,13 +6,15 @@ import '../data/circle_repository.dart';
 import '../model/circle.dart';
 import 'circle_list_controller.dart';
 
-/// 圈子详情页状态：圈子信息 + 圈内帖子流（最新）分页。
+/// 圈子详情页状态：圈子信息 + 圈内帖子流（最新/最热双 Tab）分页。
 class CircleDetailState {
   const CircleDetailState({
     required this.circle,
     required this.posts,
     required this.nextCursor,
     required this.hasMore,
+    this.sort = CirclePostSort.newest,
+    this.sortSwitching = false,
     this.loadingMore = false,
     this.loadMoreError,
     this.joinBusy = false,
@@ -22,6 +24,12 @@ class CircleDetailState {
   final List<Post> posts;
   final String? nextCursor;
   final bool hasMore;
+
+  /// 圈内流当前排序 Tab
+  final CirclePostSort sort;
+
+  /// 切 Tab 重拉帖子中（帖子区局部 loading，头部信息保留）
+  final bool sortSwitching;
   final bool loadingMore;
   final String? loadMoreError;
 
@@ -33,6 +41,8 @@ class CircleDetailState {
     List<Post>? posts,
     String? nextCursor,
     bool? hasMore,
+    CirclePostSort? sort,
+    bool? sortSwitching,
     bool? loadingMore,
     String? Function()? loadMoreError,
     bool? joinBusy,
@@ -42,6 +52,8 @@ class CircleDetailState {
       posts: posts ?? this.posts,
       nextCursor: nextCursor ?? this.nextCursor,
       hasMore: hasMore ?? this.hasMore,
+      sort: sort ?? this.sort,
+      sortSwitching: sortSwitching ?? this.sortSwitching,
       loadingMore: loadingMore ?? this.loadingMore,
       loadMoreError: loadMoreError != null
           ? loadMoreError()
@@ -62,28 +74,41 @@ class CircleDetailController extends AsyncNotifier<CircleDetailState> {
 
   CircleRepository get _repo => ref.read(circleRepositoryProvider);
 
+  /// 当前排序（build 重入时保持）
+  CirclePostSort _sort = CirclePostSort.newest;
+
   @override
   Future<CircleDetailState> build() async {
     // 顺序拉取，保证失败时向上抛原始 ApiException（.wait 会包成 ParallelWaitError）
     final circle = await _repo.fetchCircleDetail(circleId);
-    final page = await _repo.fetchCirclePosts(circleId, size: pageSize);
+    final page = await _repo.fetchCirclePosts(
+      circleId,
+      sort: _sort,
+      size: pageSize,
+    );
     return CircleDetailState(
       circle: circle,
       posts: page.list,
       nextCursor: page.nextCursor,
       hasMore: page.hasMore,
+      sort: _sort,
     );
   }
 
   Future<void> refresh() async {
     final circle = await _repo.fetchCircleDetail(circleId);
-    final page = await _repo.fetchCirclePosts(circleId, size: pageSize);
+    final page = await _repo.fetchCirclePosts(
+      circleId,
+      sort: _sort,
+      size: pageSize,
+    );
     state = AsyncData(
       CircleDetailState(
         circle: circle,
         posts: page.list,
         nextCursor: page.nextCursor,
         hasMore: page.hasMore,
+        sort: _sort,
       ),
     );
   }
@@ -93,9 +118,55 @@ class CircleDetailController extends AsyncNotifier<CircleDetailState> {
     state = await AsyncValue.guard(build);
   }
 
+  /// 切换圈内流排序 Tab：保留头部信息，仅帖子区重拉。
+  /// 失败回滚到原 Tab 并抛 [ApiException] 由页面提示。
+  Future<void> changeSort(CirclePostSort sort) async {
+    final current = state.value;
+    if (current == null || current.sortSwitching || sort == current.sort) {
+      return;
+    }
+
+    _sort = sort;
+    state = AsyncData(
+      current.copyWith(
+        sort: sort,
+        sortSwitching: true,
+        loadMoreError: () => null,
+      ),
+    );
+    try {
+      final page = await _repo.fetchCirclePosts(
+        circleId,
+        sort: sort,
+        size: pageSize,
+      );
+      final latest = state.value ?? current;
+      state = AsyncData(
+        latest.copyWith(
+          posts: page.list,
+          nextCursor: page.nextCursor,
+          hasMore: page.hasMore,
+          sortSwitching: false,
+        ),
+      );
+    } on ApiException {
+      _sort = current.sort;
+      final latest = state.value ?? current;
+      state = AsyncData(
+        latest.copyWith(sort: current.sort, sortSwitching: false),
+      );
+      rethrow;
+    }
+  }
+
   Future<void> loadMore() async {
     final current = state.value;
-    if (current == null || current.loadingMore || !current.hasMore) return;
+    if (current == null ||
+        current.loadingMore ||
+        current.sortSwitching ||
+        !current.hasMore) {
+      return;
+    }
 
     state = AsyncData(
       current.copyWith(loadingMore: true, loadMoreError: () => null),
@@ -103,6 +174,7 @@ class CircleDetailController extends AsyncNotifier<CircleDetailState> {
     try {
       final page = await _repo.fetchCirclePosts(
         circleId,
+        sort: current.sort,
         cursor: current.nextCursor,
         size: pageSize,
       );

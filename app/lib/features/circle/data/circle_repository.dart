@@ -18,7 +18,12 @@ abstract interface class CircleRepository {
 
   Future<void> quitCircle(int id);
 
-  Future<PostPage> fetchCirclePosts(int circleId, {String? cursor, int size});
+  Future<PostPage> fetchCirclePosts(
+    int circleId, {
+    CirclePostSort sort,
+    String? cursor,
+    int size,
+  });
 }
 
 class CircleRepositoryHttp implements CircleRepository {
@@ -43,10 +48,13 @@ class CircleRepositoryHttp implements CircleRepository {
   @override
   Future<PostPage> fetchCirclePosts(
     int circleId, {
+    CirclePostSort sort = CirclePostSort.newest,
     String? cursor,
     int size = 20,
-  }) =>
-      _guard(() => _api.fetchCirclePosts(circleId, cursor: cursor, size: size));
+  }) => _guard(
+    () =>
+        _api.fetchCirclePosts(circleId, sort: sort, cursor: cursor, size: size),
+  );
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
@@ -169,15 +177,23 @@ class CircleRepositoryMock implements CircleRepository {
   @override
   Future<PostPage> fetchCirclePosts(
     int circleId, {
+    CirclePostSort sort = CirclePostSort.newest,
     String? cursor,
     int size = 20,
   }) async {
-    // 复用推荐流数据按圈名过滤，模拟圈内流
+    // 复用推荐流数据按圈名过滤，模拟圈内流；置顶帖恒前置（对齐 circle_top 语义）
     final detail = await fetchCircleDetail(circleId);
     final page = await _feedRepository.fetchRecommend(size: 100);
     final filtered = page.list
         .where((p) => p.circleName == detail.name)
         .toList();
+    filtered.sort((a, b) {
+      if (a.isTop != b.isTop) return a.isTop ? -1 : 1;
+      return switch (sort) {
+        CirclePostSort.newest => b.createdAt.compareTo(a.createdAt),
+        CirclePostSort.hot => b.likeCount.compareTo(a.likeCount),
+      };
+    });
     final offset = int.tryParse(cursor ?? '0') ?? 0;
     final end = (offset + size).clamp(0, filtered.length);
     final hasMore = end < filtered.length;

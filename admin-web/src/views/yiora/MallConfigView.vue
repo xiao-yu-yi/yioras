@@ -120,9 +120,12 @@
       <el-table-column label="购买人" width="100">
         <template #default="{ row }">{{ row.soldTo ? '#' + row.soldTo : '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="row.status !== 2" size="small" @click="openEdit(row)">编辑</el-button>
+          <template v-if="row.status !== 2">
+            <el-button size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="removePretty(row)">删除</el-button>
+          </template>
           <span v-else class="sub">已成交</span>
         </template>
       </el-table-column>
@@ -238,7 +241,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, type AdminDecoItem, type AdminPrettyNoItem, type AdminPrizeItem, type AdminTaskCfgItem } from '@/api/yiora'
 import UploadImage from '@/components/UploadImage.vue'
 
@@ -292,6 +295,14 @@ function openEdit(row?: AdminDecoItem | AdminPrizeItem | AdminTaskCfgItem | Admi
     Object.assign(prettyForm, row ?? { id: 0, no: '', rarity: 1, price: 50 })
     prettyDialog.value = true
   }
+}
+
+async function removePretty(row: AdminPrettyNoItem) {
+  const ok = await ElMessageBox.confirm(`确认删除靓号「${row.no}」?`, '删除', { type: 'warning' }).catch(() => null)
+  if (!ok) return
+  await api.deletePrettyNo(row.id)
+  ElMessage.success('已删除')
+  load()
 }
 
 async function savePretty() {

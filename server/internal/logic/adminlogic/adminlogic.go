@@ -1451,6 +1451,19 @@ func (l *Logic) SavePrettyNo(ctx context.Context, adminID int64, req *types.Admi
 	return id, nil
 }
 
+// DeletePrettyNo 删除未售靓号 SKU。
+func (l *Logic) DeletePrettyNo(ctx context.Context, adminID, id int64, ip string) error {
+	ok, err := l.svcCtx.AdminModel.DeletePrettyNoAdmin(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return xerr.New(xerr.CodeForbidden, "靓号不存在或已售出(已售不可删除)")
+	}
+	l.opLog(ctx, adminID, "ops.mall.prettyno.delete", fmt.Sprintf("sku:%d", id), "", ip)
+	return nil
+}
+
 // TaskCfgs 后台任务列表(含停用)。
 func (l *Logic) TaskCfgs(ctx context.Context) ([]types.AdminTaskCfgItem, error) {
 	rows, err := l.svcCtx.TaskModel.ListTasksAdmin(ctx)

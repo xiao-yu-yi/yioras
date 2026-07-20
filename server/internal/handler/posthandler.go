@@ -66,6 +66,76 @@ func deactivatedGuard(svcCtx *svc.ServiceContext) func(http.HandlerFunc) http.Ha
 	}
 }
 
+func sharePostHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := mustUID(w, r)
+		if !ok {
+			return
+		}
+		var req types.IDPath
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := postlogic.New(svcCtx).Share(r.Context(), uid, req.ID)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
+func resolveShareHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ShareResolveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		out, err := postlogic.New(svcCtx).ResolveShare(r.Context(), req.Code)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
+func userSettingsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := mustUID(w, r)
+		if !ok {
+			return
+		}
+		out, err := userlogic.New(svcCtx).Settings(r.Context(), uid)
+		if err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, out)
+	}
+}
+
+func updateSettingsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := mustUID(w, r)
+		if !ok {
+			return
+		}
+		var req types.UpdateSettingsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			resp.Error(w, r, xerr.Param(err.Error()))
+			return
+		}
+		if err := userlogic.New(svcCtx).UpdateSettings(r.Context(), uid, &req); err != nil {
+			resp.Error(w, r, err)
+			return
+		}
+		resp.OK(w, r, nil)
+	}
+}
+
 func feedHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.FeedReq

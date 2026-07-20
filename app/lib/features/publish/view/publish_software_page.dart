@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../software/controller/software_list_controller.dart';
+import '../../software/model/software.dart';
 import '../data/publish_repository.dart';
 import '../model/software_draft.dart';
 import '../widget/dashed_border.dart';
@@ -27,12 +29,13 @@ class _PublishSoftwarePageState extends ConsumerState<PublishSoftwarePage> {
   final _versionController = TextEditingController();
   final _sizeController = TextEditingController();
   final _urlController = TextEditingController();
+  final _extractCodeController = TextEditingController();
   final _picker = ImagePicker();
 
   String _logoPath = '';
   final List<String> _imagePaths = [];
   int _type = 1;
-  String _category = '';
+  SoftwareCategory? _category;
   String _channel = '';
   final List<String> _tags = [];
   bool _submitting = false;
@@ -46,6 +49,7 @@ class _PublishSoftwarePageState extends ConsumerState<PublishSoftwarePage> {
     _versionController.dispose();
     _sizeController.dispose();
     _urlController.dispose();
+    _extractCodeController.dispose();
     super.dispose();
   }
 
@@ -61,6 +65,7 @@ class _PublishSoftwarePageState extends ConsumerState<PublishSoftwarePage> {
     channel: _channel,
     tags: [..._tags],
     downloadUrl: _urlController.text.trim(),
+    extractCode: _extractCodeController.text.trim(),
   );
 
   bool get _canSubmit => !_submitting && _currentDraft().canSubmit;
@@ -352,7 +357,7 @@ class _PublishSoftwarePageState extends ConsumerState<PublishSoftwarePage> {
                             enabled: !_submitting,
                             onChanged: (type) => setState(() {
                               _type = type;
-                              _category = '';
+                              _category = null;
                             }),
                           ),
                         ),
@@ -465,6 +470,15 @@ class _PublishSoftwarePageState extends ConsumerState<PublishSoftwarePage> {
                           label: '下载链接',
                           hint: '填写 http 或 https 下载链接',
                           controller: _urlController,
+                          enabled: !_submitting,
+                          onChanged: () => setState(() {}),
+                        ),
+                        _rowDivider(scheme),
+                        // 提取码（3.5.2：支持网盘链接 + 提取码）
+                        _InputRow(
+                          label: '提取码',
+                          hint: '网盘提取码（选填）',
+                          controller: _extractCodeController,
                           enabled: !_submitting,
                           onChanged: () => setState(() {}),
                         ),
@@ -767,7 +781,7 @@ class _TypeChips extends StatelessWidget {
   }
 }
 
-/// 软件分类 chips：按发布类型从仓库拉取
+/// 软件分类 chips：按发布类型从软件库仓库拉取（对齐 categoryId 契约）
 class _CategoryChips extends ConsumerWidget {
   const _CategoryChips({
     required this.type,
@@ -777,13 +791,13 @@ class _CategoryChips extends ConsumerWidget {
   });
 
   final int type;
-  final String current;
+  final SoftwareCategory? current;
   final bool enabled;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<SoftwareCategory> onChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final categories = ref.watch(softwareCategoriesProvider(type));
+    final categories = ref.watch(softwareCategoryListProvider(type));
     return switch (categories) {
       AsyncData(:final value) => ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 250),
@@ -793,38 +807,7 @@ class _CategoryChips extends ConsumerWidget {
           alignment: WrapAlignment.end,
           children: [
             for (final category in value)
-              GestureDetector(
-                onTap: enabled && category != current
-                    ? () => onChanged(category)
-                    : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: category == current
-                        ? const LinearGradient(
-                            colors: [Color(0xFFF43F5E), Color(0xFFFF7849)],
-                          )
-                        : null,
-                    color: category == current ? null : const Color(0xFFF3F4F8),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    category,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: category == current
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: category == current
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
+              _chip(context, category, active: category.id == current?.id),
           ],
         ),
       ),
@@ -841,6 +824,38 @@ class _CategoryChips extends ConsumerWidget {
         child: CircularProgressIndicator(strokeWidth: 1.6),
       ),
     };
+  }
+
+  Widget _chip(
+    BuildContext context,
+    SoftwareCategory category, {
+    required bool active,
+  }) {
+    return GestureDetector(
+      onTap: enabled && !active ? () => onChanged(category) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: active
+              ? const LinearGradient(
+                  colors: [Color(0xFFF43F5E), Color(0xFFFF7849)],
+                )
+              : null,
+          color: active ? null : const Color(0xFFF3F4F8),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          category.name,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: active
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -889,9 +904,3 @@ class _TagChip extends StatelessWidget {
     );
   }
 }
-
-/// 软件分类数据源（按发布类型缓存）
-final softwareCategoriesProvider = FutureProvider.autoDispose
-    .family<List<String>, int>((ref, type) {
-      return ref.watch(publishRepositoryProvider).fetchSoftwareCategories(type);
-    });

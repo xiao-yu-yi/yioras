@@ -1,7 +1,11 @@
-# Yiora 发版前回归冒烟基线:重置数据卷 → 起四服务 → 依次跑四个套件
-# 用法(在 server/ 目录): powershell -ExecutionPolicy Bypass -File scripts\smoke.ps1
+# Yiora 发版前回归冒烟基线:重置数据卷 → 起全部服务 → 依次跑各套件
+# 用法(在 server/ 目录): powershell -ExecutionPolicy Bypass -File scripts/smoke.ps1
+#   Linux/CI(pwsh 7): pwsh -File scripts/smoke.ps1
 # 套件有依赖顺序:community 注册账号 → software/m3 复用账号 → mall 复用忧珠
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 与 pwsh 7(CI/Linux)双兼容:子套件用当前引擎再起进程
+$psBin = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh' } else { 'powershell' }
 
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
@@ -36,21 +40,21 @@ try {
     }
 
     $suites = @(
-        @{name = "community"; file = "scripts\smoke-community.ps1"; sentinel = "SMOKE_DONE"},
-        @{name = "software";  file = "scripts\smoke-software.ps1";  sentinel = "SOFT_SMOKE_DONE"},
-        @{name = "m3";        file = "scripts\smoke-m3.ps1";        sentinel = "M3_SMOKE_DONE"},
-        @{name = "mall";      file = "scripts\smoke-mall.ps1";      sentinel = "MALL_SMOKE_DONE"},
-        @{name = "paid-ai";   file = "scripts\smoke-paid-ai.ps1";   sentinel = "PAID_AI_SMOKE_DONE"},
-        @{name = "content";   file = "scripts\smoke-content.ps1";   sentinel = "CONTENT_SMOKE_DONE"},
-        @{name = "account";   file = "scripts\smoke-account.ps1";   sentinel = "ACCOUNT_SMOKE_DONE"},
-        @{name = "p1";        file = "scripts\smoke-p1.ps1";        sentinel = "P1_SMOKE_DONE"},
-        @{name = "p2";        file = "scripts\smoke-p2.ps1";        sentinel = "P2_SMOKE_DONE"},
-        @{name = "admin";     file = "scripts\smoke-admin.ps1";     sentinel = "ADMIN_SMOKE_DONE"}
+        @{name = "community"; file = "scripts/smoke-community.ps1"; sentinel = "SMOKE_DONE"},
+        @{name = "software";  file = "scripts/smoke-software.ps1";  sentinel = "SOFT_SMOKE_DONE"},
+        @{name = "m3";        file = "scripts/smoke-m3.ps1";        sentinel = "M3_SMOKE_DONE"},
+        @{name = "mall";      file = "scripts/smoke-mall.ps1";      sentinel = "MALL_SMOKE_DONE"},
+        @{name = "paid-ai";   file = "scripts/smoke-paid-ai.ps1";   sentinel = "PAID_AI_SMOKE_DONE"},
+        @{name = "content";   file = "scripts/smoke-content.ps1";   sentinel = "CONTENT_SMOKE_DONE"},
+        @{name = "account";   file = "scripts/smoke-account.ps1";   sentinel = "ACCOUNT_SMOKE_DONE"},
+        @{name = "p1";        file = "scripts/smoke-p1.ps1";        sentinel = "P1_SMOKE_DONE"},
+        @{name = "p2";        file = "scripts/smoke-p2.ps1";        sentinel = "P2_SMOKE_DONE"},
+        @{name = "admin";     file = "scripts/smoke-admin.ps1";     sentinel = "ADMIN_SMOKE_DONE"}
     )
     $failed = @()
     foreach ($s in $suites) {
         Write-Output "== suite: $($s.name) =="
-        $out = powershell -ExecutionPolicy Bypass -File $s.file 2>&1 | Out-String
+        $out = & $psBin -ExecutionPolicy Bypass -File $s.file 2>&1 | Out-String
         Write-Output $out
         if ($out -notmatch $s.sentinel) { $failed += $s.name }
     }

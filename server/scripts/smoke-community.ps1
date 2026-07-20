@@ -31,7 +31,7 @@ Write-Output "[1] register U1=$uidA/$($r1.data.displayNo) U2=$uidB/$($r2.data.di
 # 2. 加圈 + 发帖(帖图先直传对象存储,业务侧强制域名白名单) + 推荐流
 (PostJson "$api/circles/2/join" @{} $h1).code | Out-Null
 $pre = PostJson "$api/upload/presign" @{kind = "post"; fileName = "1.png"; size = 256} $h1
-$tmpImg = Join-Path $env:TEMP "smoke_c_img.png"
+$tmpImg = Join-Path ([IO.Path]::GetTempPath()) "smoke_c_img.png"
 [IO.File]::WriteAllBytes($tmpImg, (New-Object byte[] 256))
 Invoke-WebRequest -Method Put -Uri $pre.data.uploadUrl -InFile $tmpImg -UseBasicParsing | Out-Null
 Remove-Item $tmpImg -ErrorAction SilentlyContinue

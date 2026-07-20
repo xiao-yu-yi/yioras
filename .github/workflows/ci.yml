@@ -1,6 +1,7 @@
 # Yiora Server CI/CD
 # verify:      gofmt / go vet / go build / 单测(+race,Linux 有 CGO)
 # integration: testcontainers 拉真 MySQL 8 验忧珠账务并发安全
+# smoke:       compose 起全栈(mysql/redis/minio/api/ws)跑 scripts/smoke.ps1 十套件回归
 # image:       main 分支与 v* 标签构建并推送 GHCR 镜像(一镜像含 api+ws 双二进制)
 name: server-ci
 
@@ -68,10 +69,29 @@ jobs:
       - name: integration tests (testcontainers + mysql:8.0)
         run: go test -tags integration -count=1 -timeout 20m -v -run TestIntegration ./internal/model/
 
+  smoke:
+    name: full-stack smoke (compose + pwsh)
+    runs-on: ubuntu-latest # 自带 docker compose v2 与 pwsh 7
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: run smoke baseline
+        shell: pwsh
+        run: ./scripts/smoke.ps1
+
+      - name: dump service logs on failure
+        if: failure()
+        run: docker compose logs --tail 200 api ws mysql
+
+      - name: teardown
+        if: always()
+        run: docker compose down -v
+
   image:
     name: build & push image (GHCR)
     runs-on: ubuntu-latest
-    needs: [verify, integration]
+    needs: [verify, integration, smoke]
     # 仅主干推进与版本标签发布镜像;PR 只做构建验证
     if: github.event_name == 'push'
     permissions:

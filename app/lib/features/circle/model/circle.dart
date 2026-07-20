@@ -92,3 +92,14 @@ enum CircleSort {
   /// 界面展示文案
   final String label;
 }
+
+/// 圈内信息流排序（文档 3.4 圈内流双 Tab：最新 / 最热，对齐 server sort=new|hot）
+enum CirclePostSort {
+  newest('new', '最新'),
+  hot('hot', '最热');
+
+  const CirclePostSort(this.value, this.label);
+
+  final String value;
+  final String label;
+}

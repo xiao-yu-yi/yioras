@@ -80,16 +80,39 @@ class _DetailBody extends ConsumerWidget {
             SliverToBoxAdapter(
               child: _InfoCard(circle: state.circle, circleId: circleId),
             ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(20, 6, 20, 0),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
               sliver: SliverToBoxAdapter(
-                child: Text(
-                  '圈内动态',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                child: Row(
+                  children: [
+                    const Text(
+                      '圈内动态',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    // 圈内流双 Tab（文档 3.4）：最新 / 最热
+                    _PostSortSwitch(circleId: circleId, current: state.sort),
+                  ],
                 ),
               ),
             ),
-            if (state.posts.isEmpty)
+            if (state.sortSwitching)
+              const SliverPadding(
+                padding: EdgeInsets.symmetric(vertical: 56),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+              )
+            else if (state.posts.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: Text('圈子里还没有帖子，来发第一帖吧')),
@@ -118,6 +141,77 @@ class _DetailBody extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 圈内流最新/最热胶囊切换（与发现页排序开关同款视觉）
+class _PostSortSwitch extends ConsumerWidget {
+  const _PostSortSwitch({required this.circleId, required this.current});
+
+  final int circleId;
+  final CirclePostSort current;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+
+    Future<void> change(CirclePostSort sort) async {
+      try {
+        await ref
+            .read(circleDetailControllerProvider(circleId).notifier)
+            .changeSort(sort);
+      } on ApiException catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text('切换失败：${e.message}')));
+        }
+      }
+    }
+
+    Widget segment(CirclePostSort sort) {
+      final active = sort == current;
+      return GestureDetector(
+        onTap: active ? null : () => change(sort),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: active ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF1F2430).withValues(alpha: .08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            sort.label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? scheme.onSurface : scheme.outline,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F1F5),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [for (final sort in CirclePostSort.values) segment(sort)],
       ),
     );
   }

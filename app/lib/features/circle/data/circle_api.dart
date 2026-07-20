@@ -50,15 +50,16 @@ class CircleApi {
     ApiResponse.fromJson(resp.data!, (_) => null).unwrap();
   }
 
-  /// 圈内帖子流（最新，游标分页；圈内最热 Tab 二期再开）
+  /// 圈内帖子流（双 Tab：最新/最热，游标分页）
   Future<PostPage> fetchCirclePosts(
     int circleId, {
+    CirclePostSort sort = CirclePostSort.newest,
     String? cursor,
     int size = 20,
   }) async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '${AppConfig.apiPrefix}/circles/$circleId/posts',
-      queryParameters: {'cursor': ?cursor, 'size': size},
+      queryParameters: {'sort': sort.value, 'cursor': ?cursor, 'size': size},
     );
     return ApiResponse.fromJson(
       resp.data!,

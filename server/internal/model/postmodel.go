@@ -375,6 +375,13 @@ func (m *PostModel) Takedown(ctx context.Context, circleID, postID int64) (autho
 	return authorID, hit, err
 }
 
+// IncrShareCount 分享口令生成计数。
+func (m *PostModel) IncrShareCount(ctx context.Context, postID int64) error {
+	_, err := m.conn.ExecCtx(ctx,
+		"UPDATE `post` SET share_count = share_count + 1 WHERE id = ?", postID)
+	return err
+}
+
 // ListHistory 我的足迹(按最近浏览,仅已发布帖)。
 func (m *PostModel) ListHistory(ctx context.Context, uid int64, offset, limit int) ([]*Post, error) {
 	var rows []*Post
