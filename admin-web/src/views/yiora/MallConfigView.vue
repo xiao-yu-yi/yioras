@@ -17,7 +17,7 @@
     <el-table v-if="tab === 'deco'" :data="decos" v-loading="loading">
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column label="类型" width="90">
-        <template #default="{ row }">{{ row.kind === 1 ? '头像框' : '气泡' }}</template>
+        <template #default="{ row }">头像框</template>
       </el-table-column>
       <el-table-column prop="name" label="名称" min-width="130" />
       <el-table-column label="预览" width="80">
@@ -101,7 +101,6 @@
         <el-form-item label="类型">
           <el-select v-model="decoForm.kind" style="width: 100%">
             <el-option :value="1" label="头像框" />
-            <el-option :value="2" label="聊天气泡" />
           </el-select>
         </el-form-item>
         <el-form-item label="名称" required><el-input v-model="decoForm.name" maxlength="30" /></el-form-item>

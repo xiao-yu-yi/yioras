@@ -1,8 +1,14 @@
 /* Yiora 业务页统一质感:卡片/表格/弹窗微调(亮暗主题均兼容,颜色走 EP css 变量) */
 
+/* 全局圆润:输入框/按钮/下拉等基础控件圆角一起放大 */
+:root {
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+}
+
 .app-main {
   .el-card {
-    border-radius: 10px;
+    border-radius: 16px;
     border: none;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
     transition: box-shadow 0.2s;
@@ -25,6 +31,22 @@
       color: var(--el-text-color-regular);
       font-weight: 600;
     }
+
+    th.el-table__cell:first-child {
+      border-top-left-radius: 10px;
+    }
+
+    th.el-table__cell:last-child {
+      border-top-right-radius: 10px;
+    }
+  }
+
+  .el-button {
+    border-radius: 8px;
+  }
+
+  .el-tag {
+    border-radius: 6px;
   }
 
   .el-pagination {
@@ -33,7 +55,15 @@
 }
 
 .el-dialog {
-  border-radius: 12px;
+  border-radius: 18px;
+}
+
+.el-message-box {
+  border-radius: 14px;
+}
+
+.el-popper.is-light {
+  border-radius: 10px;
 }
 
 /* 看板指标卡 */
