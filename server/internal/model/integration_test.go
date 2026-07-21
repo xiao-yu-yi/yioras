@@ -76,7 +76,11 @@ func setupIT(t *testing.T) *itEnv {
 		}
 	}
 
-	conn := sqlx.NewSqlConnFromDB(raw)
+	// 关闭 go-zero 内建熔断器(声明一切错误可接受):本组压测故意制造死锁(1213)、余额不足、
+	// 幂等重放等密集"失败",在慢 CI 机上会把熔断器打开,后续请求被 drop 成
+	// "circuit breaker is open",withDeadlockRetry 因错误类型改变而放弃重试(CI 偶发红的根因)。
+	// 专属容器库无需熔断保护,测试要的是原始错误本身。
+	conn := sqlx.NewSqlConnFromDB(raw, sqlx.WithAcceptable(func(error) bool { return true }))
 	return &itEnv{
 		conn:   conn,
 		youzhu: NewYouzhuModel(conn),
