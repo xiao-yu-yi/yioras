@@ -1186,11 +1186,11 @@ type AdminContentItem struct {
 	CircleID   int64  `json:"circleId,omitempty"` // 帖子专属
 	BizType    int64  `json:"bizType,omitempty"`  // 评论专属:1帖子 2软件
 	BizID      int64  `json:"bizId,omitempty"`    // 评论专属
-	IsTop      int64  `json:"isTop"`      // 帖子:首页置顶精选
-	IsEssence  int64  `json:"isEssence"`  // 帖子:加精
-	IsRedTitle int64  `json:"isRedTitle"` // 帖子:红色标题
-	IsSink     int64  `json:"isSink"`     // 帖子:下沉
-	FirstImage string `json:"firstImage"` // 帖子首图(评论恒空)
+	IsTop      int64  `json:"isTop"`              // 帖子:首页置顶精选
+	IsEssence  int64  `json:"isEssence"`          // 帖子:加精
+	IsRedTitle int64  `json:"isRedTitle"`         // 帖子:红色标题
+	IsSink     int64  `json:"isSink"`             // 帖子:下沉
+	FirstImage string `json:"firstImage"`         // 帖子首图(评论恒空)
 	LikeCount  int64  `json:"likeCount"`
 	ViewCount  int64  `json:"viewCount"` // 评论恒 0
 	CreatedAt  int64  `json:"createdAt"`
